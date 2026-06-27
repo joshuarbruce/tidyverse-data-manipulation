@@ -57,9 +57,17 @@ dt[, speed := distance / air_time]            # add one column
 dt[, c("a", "b") := .(x * 2, y * 3)]          # add several
 dt[origin == "JFK", flag := TRUE]             # conditional update on a subset
 dt[, col := NULL]                              # delete a column
+dt[, grp_mean := mean(arr_delay), by = origin] # grouped update — writes the
+                                               # group mean back to every row
 ```
 
-To avoid mutating the original, copy first: `dt2 <- copy(dt)`.
+The grouped form (`:= ... by =`) is a defining data.table idiom: it computes per
+group but assigns to the original rows in place, which in dplyr would take a
+`group_by() %>% mutate() %>% ungroup()`.
+
+To avoid mutating the original, copy first: `dt2 <- copy(dt)`. For assigning inside
+a loop over many columns, `set(dt, i, j, value)` is the lowest-overhead option
+(it skips the `[ ]` overhead entirely).
 
 ## Grouping (by)
 
@@ -77,7 +85,68 @@ function across columns:
 
 ```r
 dt[, lapply(.SD, mean), by = origin, .SDcols = c("arr_delay", "dep_delay")]
+dt[, head(.SD, 2), by = origin]                 # first 2 rows of each group
+dt[, .SD[which.max(arr_delay)], by = origin]    # the worst-delay row per group
 ```
+
+### Special symbols
+
+Inside `j` and `by`, data.table provides shorthand symbols. Knowing these unlocks
+most idioms:
+
+| Symbol | Meaning |
+|---|---|
+| `.N` | Number of rows (in the group, or whole table) |
+| `.SD` | The subset of data for the current group |
+| `.SDcols` | Which columns `.SD` should include |
+| `.I` | Integer row positions (e.g. `dt[, .I[which.max(x)], by = g]`) |
+| `.GRP` | Current group counter (1, 2, 3, …) |
+| `.BY` | Named list of the current group's `by` values |
+
+## Chaining
+
+Append brackets to pipe one result into the next query — data.table's equivalent of
+the `%>%` chain:
+
+```r
+dt[origin == "JFK", .(avg = mean(arr_delay)), by = month][order(-avg)]
+```
+
+## Keys and fast subsetting
+
+Setting a **key** physically reorders the table by one or more columns (by
+reference, in place). Subsetting on a keyed column then uses **binary search**
+(O(log n)) instead of a full vector scan — the keys vignette shows a ~489× speedup
+on 20M rows. Keys are the main reason data.table is fast for repeated lookups.
+
+```r
+setkey(dt, origin)                 # key by one column (unquoted)
+setkeyv(dt, c("origin", "dest"))   # key by a character vector (for programming)
+key(dt)                            # inspect the current key
+
+dt[.("JFK")]                       # keyed subset — binary search
+dt[.("JFK", "MIA")]                # matches origin then dest
+dt[.("JFK"), max(arr_delay)]       # combine with j
+```
+
+A table has at most one key (it can only be sorted one way). `keyby = ` in a grouped
+query both groups and leaves the result keyed/sorted. `setorder(dt, -arr_delay)`
+sorts in place without setting a key.
+
+## Secondary indices and `on=`
+
+A **secondary index** gives fast lookups on a column *without* physically reordering
+the table. The `on=` argument creates one on the fly (auto-indexing) — this is why
+the joins above use `on=`:
+
+```r
+setindex(dt, origin)               # build a reusable secondary index
+dt[origin == "JFK"]                # auto-indexed after first use
+dt["JFK", on = "origin"]           # explicit index subset, no key needed
+```
+
+Use `on=` for ad-hoc fast subsets/joins; promote to a `setkey()` when you query the
+same column repeatedly and don't mind the table being reordered.
 
 ## Reshaping: melt / dcast
 
@@ -117,6 +186,26 @@ dt <- fread("big.csv")          # auto-detects types, very fast
 fwrite(dt, "out.csv")
 ```
 
+## Fast vectorized helpers
+
+data.table ships drop-in, faster (and more type-stable) replacements for common
+operations. Prefer these inside data.table code — they avoid copies and handle types
+predictably:
+
+```r
+fifelse(x > 0, "pos", "neg")              # vectorized if_else (cf. dplyr::if_else)
+fcase(                                    # vectorized case_when
+  x < 0, "neg",
+  x == 0, "zero",
+  x > 0, "pos"
+)
+shift(x, n = 1, type = "lag")             # lag/lead (type = "lead" for forward)
+uniqueN(x)                                # count distinct (cf. n_distinct)
+nafill(x, type = "locf")                  # fill NAs: "locf", "nocb", or fill = 0
+rowid(group)                              # within-group row counter
+frank(x, ties.method = "min")             # fast rank
+```
+
 ## tidyverse ↔ data.table translation table
 
 | Task | dplyr / tidyr | data.table |
@@ -126,10 +215,15 @@ fwrite(dt, "out.csv")
 | Add/modify column | `mutate(z = x + y)` | `dt[, z := x + y]` |
 | Summarise | `summarise(m = mean(x))` | `dt[, .(m = mean(x))]` |
 | Group + summarise | `summarise(m = mean(x), .by = g)` | `dt[, .(m = mean(x)), by = g]` |
+| Grouped mutate | `group_by(g) %>% mutate(z = mean(x))` | `dt[, z := mean(x), by = g]` |
 | Arrange | `arrange(desc(x))` | `dt[order(-x)]` |
 | Count per group | `count(g)` | `dt[, .N, by = g]` |
 | Distinct rows | `distinct()` | `unique(dt)` |
+| Distinct count | `n_distinct(x)` | `uniqueN(x)` |
 | Rename | `rename(new = old)` | `setnames(dt, "old", "new")` |
+| Conditional value | `if_else(c, a, b)` | `fifelse(c, a, b)` |
+| Multi-condition | `case_when(...)` | `fcase(...)` |
+| Lag / lead | `lag(x)` / `lead(x)` | `shift(x)` / `shift(x, type = "lead")` |
 | Left join | `left_join(y, by = "id")` | `merge(dt, y, by = "id", all.x = TRUE)` |
 | Wide → long | `pivot_longer(...)` | `melt(dt, ...)` |
 | Long → wide | `pivot_wider(...)` | `dcast(dt, ...)` |
@@ -164,3 +258,23 @@ the absolute lowest overhead, or you're maintaining an existing data.table codeb
   print; add a trailing `dt[]` to force it.
 - **Type coercion in `:=`** — assigning a double into an integer column can warn or
   truncate; match types or create the column fresh.
+
+## Sources & further reading
+
+This reference distills data.table's official vignettes. For the full treatment of
+any topic, read the corresponding vignette:
+
+| Topic in this file | Official vignette |
+|---|---|
+| `DT[i, j, by]`, basics | [Introduction](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.html) |
+| `:=`, grouped update, `set()` | [Reference semantics](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-reference-semantics.html) |
+| `setkey`, binary search | [Keys and fast subsetting](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-keys-fast-subset.html) |
+| `on=`, `setindex`, auto-indexing | [Secondary indices and auto-indexing](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-secondary-indices-and-auto-indexing.html) |
+| `.SD`, `.SDcols`, special symbols | [Using .SD for data analysis](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-sd-usage.html) |
+| `melt` / `dcast` | [Reshaping data](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-reshape.html) |
+| `merge`, non-equi, rolling joins | [Joins](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-joins.html) |
+| `fread` / `fwrite` | [File reading and writing](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-fread-and-fwrite.html) |
+
+Package home: <https://r-datatable.com/> · Source: <https://github.com/Rdatatable/data.table>
+(also recorded in `sources.md`). The dtplyr bridge is documented at
+<https://dtplyr.tidyverse.org/>.
