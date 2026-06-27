@@ -2,12 +2,14 @@
 name: tidyverse-data-manipulation
 description: >
   Expert R data manipulation using the tidyverse ecosystem (dplyr, tidyr, ggplot2,
-  readr, purrr, stringr, forcats, lubridate, tibble, and related packages).
-  Use this skill whenever the user is working with R data wrangling, transformation,
-  reshaping, joining, summarizing, or visualization tasks — even if they don't
-  explicitly mention "tidyverse." Trigger on any R task involving data frames,
-  CSVs, tibbles, pipes, or any tidyverse function name. Also trigger when the
-  user asks how to clean, reshape, filter, group, join, or plot data in R.
+  readr, purrr, stringr, forcats, lubridate, tibble) and data.table, with guidance
+  on when to prefer each. Use this skill whenever the user is working with R data
+  wrangling, transformation, reshaping, joining, summarizing, or visualization tasks
+  — even if they don't explicitly mention "tidyverse" or "data.table." Trigger on
+  any R task involving data frames, data.tables, CSVs, tibbles, pipes, DT[i,j,by]
+  syntax, or any tidyverse/data.table function name. Also trigger when the user asks
+  how to clean, reshape, filter, group, join, or plot data in R, or how to speed up
+  slow R data code.
 ---
 
 # Tidyverse Data Manipulation
@@ -38,6 +40,37 @@ it) is loaded. When using `|>`, note it requires R ≥ 4.1.
    script, not scattered through the code.
 4. **No `attach()`** — always reference columns through the data frame or via tidy
    eval.
+
+## Choosing Between tidyverse and data.table
+
+The tidyverse is the **default** for this skill — it's more readable, teachable, and
+covers the whole workflow (import, wrangle, dates, strings, factors, plotting). Use
+it unless a specific reason below pushes you toward data.table.
+
+Reach for **data.table** (or `dtplyr`) when:
+
+- **The data is large** — roughly >1GB in memory, or millions of rows where dplyr
+  starts to feel slow. data.table is engineered for 10–100GB in-memory work.
+- **Speed is the explicit goal** — tight loops, repeated aggregations, or a pipeline
+  the user has flagged as a bottleneck. Profile first (`bench::mark()`) rather than
+  assuming.
+- **Zero dependencies matter** — packaging for an environment where installing the
+  tidyverse is impractical; data.table needs only base R.
+- **The codebase already uses it** — match the existing style rather than mixing
+  paradigms.
+- **Fast file I/O** — `data.table::fread()` / `fwrite()` are worth using for large
+  files even inside an otherwise-tidyverse script.
+
+**Prefer the `dtplyr` bridge when the only reason is speed.** It lets the user keep
+dplyr syntax (`lazy_dt() %>% ... %>% collect()`) while executing on the data.table
+engine — most of the speed, none of the syntax switch. Drop to raw data.table only
+when you need in-place `:=` updates, the absolute lowest overhead, or you're
+maintaining existing data.table code.
+
+When you do use data.table, read `references/data-table.md` for syntax and a full
+tidyverse↔data.table translation table. Don't silently switch paradigms mid-script
+— if you move a user from dplyr to data.table, say why (e.g., "this aggregation runs
+~10× faster in data.table at this row count").
 
 ## Package Coverage
 
@@ -313,6 +346,10 @@ For deep dives into specific topics, read the relevant reference:
 - `references/joins.md` — join types, cardinality checking, common pitfalls
 - `references/tidy-eval.md` — data masking, tidy selection, writing wrapper functions
 - `references/performance.md` — profiling, large data, vroom, dtplyr, duckdb
+- `references/data-table.md` — data.table syntax (`DT[i,j,by]`, `:=`, `.SD`,
+  melt/dcast, joins), the dtplyr bridge, and a tidyverse↔data.table translation
+  table. Read when the task involves large data, explicit speed needs, or
+  data.table itself.
 - `references/sources.md` — canonical docs site, changelog, and repo for every
   package; the maintenance path for keeping this skill current. Read this when the
   user asks where a function is documented, whether a pattern is still current, or

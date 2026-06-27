@@ -8,7 +8,8 @@ When active, Claude will:
 - Write idiomatic, modern tidyverse code (dplyr, tidyr, ggplot2, purrr, stringr, forcats, lubridate, tibble, readr)
 - Ask your pipe preference (`%>%` vs `|>`) at the start of a session and stay consistent
 - Apply current best practices (`.by` grouping, `join_by()`, `list_rbind()`, etc.)
-- Reach for reference files on joins, tidy evaluation, and performance when needed
+- Default to the tidyverse, but switch to **data.table** (or the `dtplyr` bridge) when data is large or speed is the goal — with the reasoning made explicit
+- Reach for reference files on joins, tidy evaluation, performance, and data.table when needed
 
 ## Installation
 
@@ -47,6 +48,7 @@ choice consistently for the rest of the session.
 | forcats | Factor handling |
 | lubridate | Dates and times |
 | tibble | Modern data frames |
+| data.table | High-performance manipulation for large data (with `dtplyr` bridge) |
 
 ## Reference files
 
@@ -55,6 +57,7 @@ Loaded on demand (not every session):
 - `references/joins.md` — join types, `join_by()`, cardinality, pitfalls
 - `references/tidy-eval.md` — `{{ }}`, `.data[[]]`, `all_of()`, `:=`
 - `references/performance.md` — profiling, vroom, dtplyr, duckdb, furrr
+- `references/data-table.md` — data.table syntax, dtplyr bridge, tidyverse↔data.table translation table
 - `references/sources.md` — docs site, changelog, and repo for every package
 
 ## Keeping it up to date

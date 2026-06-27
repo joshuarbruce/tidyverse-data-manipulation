@@ -64,8 +64,14 @@ feel dated.
 | Package | Docs | Source repo |
 |---|---|---|
 | dbplyr (SQL) | https://dbplyr.tidyverse.org/ | https://github.com/tidyverse/dbplyr |
-| dtplyr (data.table) | https://dtplyr.tidyverse.org/ | https://github.com/tidyverse/dtplyr |
+| dtplyr (dplyr → data.table) | https://dtplyr.tidyverse.org/ | https://github.com/tidyverse/dtplyr |
 | hms (time-of-day) | https://hms.tidyverse.org/ | https://github.com/tidyverse/hms |
+
+## High-performance alternative (see references/data-table.md)
+
+| Package | Docs | Source repo |
+|---|---|---|
+| data.table | https://r-datatable.com/ | https://github.com/Rdatatable/data.table |
 
 ## Performance (see references/performance.md)
 
