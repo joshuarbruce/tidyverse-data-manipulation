@@ -25,6 +25,7 @@ your-project/
             ├── SKILL.md
             └── references/
                 ├── joins.md
+                ├── recoding.md
                 ├── tidy-eval.md
                 ├── performance.md
                 ├── data-table.md
@@ -59,6 +60,7 @@ choice consistently for the rest of the session.
 Loaded on demand (not every session):
 
 - `references/joins.md` — join types, `join_by()`, cardinality, pitfalls
+- `references/recoding.md` — `case_when()` / `replace_when()` / `recode_values()` / `replace_values()`, lookup tables, migrating off `case_match()`
 - `references/tidy-eval.md` — `{{ }}`, `.data[[]]`, `all_of()`, `:=`
 - `references/performance.md` — profiling, vroom, dtplyr, duckdb, furrr
 - `references/data-table.md` — data.table syntax, dtplyr bridge, tidyverse↔data.table translation table
