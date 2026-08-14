@@ -1,11 +1,11 @@
 ---
 name: tidyverse-data-manipulation
 description: >
-  Expert R data manipulation with the tidyverse (dplyr, tidyr, ggplot2, readr, purrr,
-  stringr, forcats, lubridate, tibble) and data.table, and when to prefer each. Use
-  for any R task on data frames, tibbles, data.tables, CSVs, pipes or DT[i,j,by]:
-  cleaning, reshaping, filtering, joining, summarizing, plotting, or speeding up slow
-  R code.
+  Expert R data manipulation across the tidyverse and data.table, including when to
+  prefer each. Use for any R task that cleans or reshapes a data frame, joins tables,
+  summarizes by group, or plots results. Covers dplyr and tidyr wrangling, readr
+  import, purrr iteration, stringr and lubridate cleanup, forcats factors, tibble
+  basics, ggplot2 charts, and the dtplyr bridge for large data.
 metadata:
   author: Joshua Bruce (@joshuarbruce)
   version: "1.1"
