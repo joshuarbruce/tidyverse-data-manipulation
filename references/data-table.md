@@ -276,5 +276,5 @@ any topic, read the corresponding vignette:
 | `fread` / `fwrite` | [File reading and writing](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-fread-and-fwrite.html) |
 
 Package home: <https://r-datatable.com/> · Source: <https://github.com/Rdatatable/data.table>
-(also recorded in `sources.md`). The dtplyr bridge is documented at
+(also recorded in [sources.md](sources.md)). The dtplyr bridge is documented at
 <https://dtplyr.tidyverse.org/>.

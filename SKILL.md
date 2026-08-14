@@ -93,6 +93,12 @@ dialect. Examples in these files use `%>%`; convert them to the user's choice.
 df %>% summarise(total = sum(x), .by = c(region, year))
 ```
 
+`group_by()` is the opposite: grouping is attached to the data frame and **every later
+verb inherits it until `ungroup()`**. `summarise()` drops only the *last* grouping
+variable, so a two-column grouping leaves the result still grouped — pass
+`.groups = "drop"`, or use `.by`. Wrongly-scoped results here are valid, not errors,
+so nothing warns you.
+
 **Joins** — always `join_by()`; declare cardinality to catch surprises.
 
 ```r

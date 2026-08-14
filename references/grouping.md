@@ -42,8 +42,51 @@ df %>%
 With `.by` this would repeat the grouping on every verb. Rule of thumb: one verb →
 `.by`; several verbs sharing a grouping → `group_by()` + `ungroup()`.
 
-Always `ungroup()` when finished. A silently grouped data frame returned from a
-function is a classic source of wrong results downstream.
+### Grouping persists until you remove it
+
+`group_by()` attaches grouping to the data frame itself. **Every subsequent verb
+inherits it** — `filter()`, `mutate()`, `arrange()`, and `select()` all return a still-
+grouped result — and it travels with the object out of a function and into whatever
+runs next. `ungroup()` is the only thing that clears it.
+
+Inspect it when unsure:
+
+```r
+group_vars(df)   # character vector of grouping columns, empty if ungrouped
+n_groups(df)     # how many groups
+```
+
+The trap is that grouped results are usually *valid*, just computed over the wrong
+scope, so nothing errors:
+
+```r
+totals <- df %>%
+  group_by(region, year) %>%
+  summarise(total = sum(sales))     # still grouped by region!
+
+totals %>% mutate(pct = total / sum(total))   # pct within region, not overall
+```
+
+**`summarise()` removes only the last grouping variable**, so grouping by two columns
+leaves the result grouped by the first. dplyr says so in a message, which is easy to
+miss in a long script. Be explicit instead:
+
+```r
+df %>% group_by(region, year) %>% summarise(total = sum(sales), .groups = "drop")
+```
+
+`.groups` accepts `"drop"` (ungrouped — usually what you want), `"drop_last"` (the
+default), or `"keep"`.
+
+None of this applies to `.by`, which never returns grouped data — that is the main
+reason to prefer it:
+
+```r
+df %>% summarise(total = sum(sales), .by = c(region, year))   # 0 groups
+```
+
+Always `ungroup()` when finished with a `group_by()` chain. A silently grouped data
+frame returned from a function is a classic source of wrong results downstream.
 
 ### Grouped mutate (window functions)
 
