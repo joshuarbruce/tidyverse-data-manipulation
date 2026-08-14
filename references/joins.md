@@ -57,11 +57,34 @@ left_join(a, b, by = join_by(id), unmatched = "error")  # error if any b key has
 
 ## Pitfalls
 
-- **Duplicate keys** — if both tables have duplicate key values, you get a
-  Cartesian product for those keys. Use `relationship = "many-to-one"` or check
-  with `count()` first.
-- **NA matching** — by default `NA` keys do NOT match. Set `na_matches = "na"` to
-  match NAs.
+**`NA` keys match each other by default.** dplyr's default is
+`na_matches = "na"`, so a row with `NA` in the key joins to another row with `NA`
+in the key — as if `NA` were an ordinary value:
+
+```r
+left_join(a, b, by = join_by(k))                      # NA row matches the NA row
+left_join(a, b, by = join_by(k), na_matches = "never") # NA row gets NA columns
+```
+
+**This is the opposite of SQL**, where `NULL` never equals `NULL` and such rows never
+match. If you are translating a query or reasoning from SQL habits, set
+`na_matches = "never"` explicitly. Missing keys are rarely meaningful entities, so
+joining them together usually creates spurious matches.
+
+**Row counts can silently grow.** If both sides have duplicate key values you get a
+Cartesian product for those keys — 2 rows joined to 2 rows returns 4. dplyr does warn
+about an unexpected many-to-many relationship, but a warning is easy to lose in a long
+script. Declare the expectation so it errors instead:
+
+```r
+left_join(a, b, by = join_by(k), relationship = "many-to-one")
+```
+
+Check row counts before and after any join. A join that changes `nrow()` when you did
+not expect it to is the single most common source of wrong analysis results.
+
+**Other traps:**
+
 - **Factor vs character** — join keys must be the same type. Use `as.character()`
   or `as_factor()` to align.
 - **Column name conflicts** — if both tables have a non-key column with the same

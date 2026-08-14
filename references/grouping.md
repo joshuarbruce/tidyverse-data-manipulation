@@ -133,6 +133,25 @@ need explicit tie handling. Note this family takes `by`, not `.by`:
 df %>% slice_max(value, n = 1, by = region, with_ties = FALSE)
 ```
 
+**`with_ties` defaults to `TRUE`, so `n = 1` can return more than one row per group.**
+Nothing warns — a "top 1 per group" that quietly returns two rows for a tied group will
+inflate every downstream count. Set `with_ties = FALSE` when you need exactly `n`, and
+add a deterministic tiebreak (`arrange()` first, or include a unique column) so the row
+kept is not arbitrary.
+
+### `arrange()` ignores grouping
+
+Unlike every other verb, `arrange()` does **not** respect `group_by()` unless you ask:
+
+```r
+df %>% group_by(region) %>% arrange(value)                   # sorts the whole table
+df %>% group_by(region) %>% arrange(value, .by_group = TRUE) # sorts within region
+```
+
+This is a documented deliberate choice, not a bug, but it surprises people who assume
+grouping applies uniformly. It matters whenever sort order is load-bearing — before
+`slice_head()`, before `fill()`, or when computing `lag()`/`lead()` within a group.
+
 ## `across()` — one function, many columns
 
 ```r
@@ -205,3 +224,8 @@ df %>% summarise(n = n(), .by = region)       # equivalent, more explicit
 `n_distinct(x)` counts unique values. `count()` on the key columns is the quickest way
 to check for duplicates before a join — see
 [joins.md](joins.md).
+
+**`n_distinct()` counts `NA` as one of the distinct values** — `n_distinct(c(1, NA, NA))`
+is 2, not 1. Pass `na.rm = TRUE` when you mean "how many real values are there". The
+same applies to `count()`, which gives `NA` its own row; that row is easy to overlook
+in a long result and inflates any total computed from it.

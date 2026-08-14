@@ -43,6 +43,35 @@ Convert character to factor with `factor()` (alphabetical levels) or `as_factor(
 (levels in order of first appearance). `as_factor()` is usually what you want when the
 data already arrives in a meaningful order.
 
+### Two factor traps that produce wrong numbers silently
+
+**`as.numeric()` on a factor returns the level codes, not the values.** This is the
+classic R data-loss bug and nothing warns:
+
+```r
+f <- factor(c("10", "20", "30"))
+as.numeric(f)                  # 1 2 3   <- positions in the level table
+as.numeric(as.character(f))    # 10 20 30
+```
+
+Always go through `as.character()`. The bug is most common when a numeric column was
+read in as a factor or character, "converted", and then averaged — producing a
+plausible-looking mean of level indices.
+
+**Filtering rows does not drop the levels.** A factor keeps every level it was created
+with, even when no rows use them any more:
+
+```r
+d <- tibble(f = factor(c("a", "b", "c")), v = 1:3) %>% filter(f != "c")
+levels(d$f)                    # "a" "b" "c" — "c" survives
+```
+
+Those phantom levels reappear as empty bars in a plot, empty facets, and zero-count
+rows in `count(f, .drop = FALSE)`. Call `fct_drop()` (or `droplevels()`) after
+filtering when the removed categories should be gone for good. The reverse is also
+worth knowing: `count()` **drops** empty levels by default, so a category that legitimately
+has zero rows disappears from a summary table unless you pass `.drop = FALSE`.
+
 ## lubridate — dates and times
 
 ### Parsing
@@ -58,6 +87,17 @@ ymd_hms("2024-01-15 13:45:00", tz = "America/New_York")
 ```
 
 `today()` and `now()` give the current date and datetime.
+
+**Unparseable input becomes `NA` with only a warning**, so a format the parser does not
+recognize turns into missing data rather than an error:
+
+```r
+ymd(c("2024-01-01", "not a date"))   # 2024-01-01, NA  + "1 failed to parse"
+```
+
+After parsing any date column, check `sum(is.na(parsed))` against what you expected. A
+mixed-format column — some `01/02/2024`, some `2024-01-02` — will partially parse and
+leave a plausible-looking result that is quietly missing half its rows.
 
 ### Extracting components
 

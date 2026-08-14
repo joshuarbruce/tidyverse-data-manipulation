@@ -28,6 +28,34 @@ Reach for `filter_out()` whenever you catch yourself writing `!=`, `!`, or
 `%in%` with a leading `!` — the positive form is nearly always clearer, and it removes
 a whole class of NA bugs.
 
+### Conditions that return `NA` silently drop rows
+
+Any predicate returning `NA` counts as `FALSE` in `filter()`, so those rows vanish with
+no warning. This bites most often with `str_detect()`, which propagates `NA`:
+
+```r
+s <- c("apple", NA, "banana")
+str_detect(s, "an")                    # TRUE, NA, TRUE
+
+tibble(s) %>% filter(str_detect(s, "an"))      # 1 row — the NA row is gone
+tibble(s) %>% filter_out(str_detect(s, "an"))  # 2 rows — the NA row is kept
+```
+
+Whenever a filter shrinks the data more than expected, count the `NA`s in the columns
+the condition touches before assuming the logic is wrong.
+
+**`%in%` never returns `NA`** — it returns `FALSE`, because it asks about set
+membership rather than equality:
+
+```r
+NA %in% c(1, 2)   # FALSE
+NA == 1           # NA
+```
+
+That makes `x %in% values` safe from NA propagation, but it also means
+`filter(x %in% c(1))` silently drops `NA` rows. If missing values should be kept, say
+so: `filter(x %in% c(1) | is.na(x))`, or invert with `filter_out()`.
+
 ## Combining conditions: `when_any()` / `when_all()`
 
 These are elementwise versions of `any()` and `all()`: `when_any(x, y, z)` is
@@ -151,6 +179,35 @@ recode_values(score, 1 ~ "low", 2 ~ "mid", unmatched = "error")
 
 `case_when()` has the same argument as `.unmatched = "error"`. Use it in pipelines
 where an unmapped category is a data-quality signal rather than an expected case.
+
+## Traps
+
+**Never use base `ifelse()` — it strips attributes, including the class.** A `Date`
+comes back as the raw number of days since 1970, silently:
+
+```r
+d <- as.Date(c("2024-01-01", "2024-06-01"))
+
+ifelse(d > as.Date("2024-03-01"), d, NA)   # 19875 — a number, class lost
+if_else(d > as.Date("2024-03-01"), d, NA)  # 2024-06-01 — still a Date
+```
+
+The same applies to factors, times, and any vctrs-backed type. `dplyr::if_else()` is
+type-stable and checks that both branches have the same type, so a mismatch errors
+instead of coercing. Use it everywhere; `data.table::fifelse()` behaves the same way
+inside data.table code.
+
+**`case_when()` evaluates every right-hand side for every row**, not just the rows that
+match. Branches that are invalid outside their own condition still run:
+
+```r
+case_when(x > 0 ~ sqrt(x), .default = 0)   # warns "NaNs produced" if x has negatives
+```
+
+The result is correct — unmatched rows take the default — but the warning is real and
+signals wasted computation on values you filtered against. When a branch genuinely
+cannot be evaluated on all rows, guard the input instead of the output, or use
+`replace_when()` so untouched values are never recomputed.
 
 ## Migrating from older functions
 

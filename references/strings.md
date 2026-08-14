@@ -46,6 +46,19 @@ matches this skill's snake_case convention:
 df %>% rename_with(str_to_snake)
 ```
 
+## `NA` propagates through `str_*`
+
+Every `str_*` function returns `NA` for `NA` input — including the predicates:
+
+```r
+str_detect(c("apple", NA, "banana"), "an")   # TRUE, NA, TRUE
+```
+
+Because `filter()` treats `NA` as `FALSE`, a `str_detect()` condition silently drops
+missing rows. Use `filter_out()` for the negative case, or handle `NA` explicitly with
+`replace_na()` or `coalesce()` before matching. See
+[filtering-and-recoding.md](filtering-and-recoding.md).
+
 ## Matching
 
 ```r

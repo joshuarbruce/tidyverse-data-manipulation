@@ -29,6 +29,20 @@ Key patterns:
 Note the size argument for lines is **`linewidth`**, not `size` — this changed in
 ggplot2 3.4 and old code using `size` for lines now warns.
 
+**`geom_bar()` counts rows; `geom_col()` plots the value.** Both render a bar chart, so
+the wrong one produces a valid-looking chart with wrong heights and no warning:
+
+```r
+df <- tibble(cat = c("a", "b"), n = c(5, 10))
+
+ggplot(df, aes(cat)) + geom_bar()        # every bar height 1 — it counted the rows
+ggplot(df, aes(cat, n)) + geom_col()     # heights 5 and 10 — what you wanted
+```
+
+Use `geom_col()` when the data is already aggregated, `geom_bar()` when you want
+ggplot2 to do the counting. `geom_bar(stat = "identity")` is equivalent to `geom_col()`
+but the latter says it more clearly.
+
 ## Reshape before plotting
 
 ggplot2 wants long data: one row per observation, with the variable that distinguishes

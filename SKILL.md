@@ -143,6 +143,28 @@ map(files, read_csv) %>% list_rbind()
 `case_match()` warns as of dplyr 1.2.0. `map_chr()` no longer coerces numbers to
 strings and now errors instead — wrap in `as.character()` or use `map_vec()`.
 
+### Silent failure modes
+
+These produce wrong answers rather than errors. Check for them before trusting a
+result, and read the linked reference when the task touches one.
+
+| Trap | Consequence | Detail |
+|---|---|---|
+| `group_by()` grouping is inherited until `ungroup()` | Later verbs compute per group | [grouping.md](references/grouping.md) |
+| `arrange()` ignores grouping unless `.by_group = TRUE` | Sort order wrong before `slice`/`lag` | [grouping.md](references/grouping.md) |
+| `slice_max(n = 1)` keeps ties by default | More rows than requested | [grouping.md](references/grouping.md) |
+| `NA` join keys **match** by default (unlike SQL) | Spurious matches on missing keys | [joins.md](references/joins.md) |
+| Duplicate keys on both sides | Row count silently multiplies | [joins.md](references/joins.md) |
+| A column shadows a same-named variable | Condition compares against the wrong thing | [tidy-eval.md](references/tidy-eval.md) |
+| `as.numeric()` on a factor | Returns level codes, not values | [factors-and-dates.md](references/factors-and-dates.md) |
+| Filtering does not drop factor levels | Phantom empty categories in plots/counts | [factors-and-dates.md](references/factors-and-dates.md) |
+| `NA` conditions drop rows in `filter()` | Data lost without warning | [filtering-and-recoding.md](references/filtering-and-recoding.md) |
+| base `ifelse()` strips class | Dates become numbers | [filtering-and-recoding.md](references/filtering-and-recoding.md) |
+| `geom_bar()` counts rows; `geom_col()` plots values | Valid-looking chart, wrong heights | [visualization.md](references/visualization.md) |
+
+**Verify row counts after every join and filter.** An unexpected change in `nrow()` is
+the earliest and cheapest signal that one of these has fired.
+
 ## Worked example
 
 ```r
