@@ -4,17 +4,40 @@
 
 Never guess at bottlenecks. Measure first:
 
+`profvis()` samples the call stack while your code runs and draws a flame graph:
+
 ```r
 library(profvis)
-profvis({ mtcars[rep(1:32, 1000), ] |> subset(mpg > 20) })  # flame graph
 
+profvis({
+  big <- mtcars[rep(1:32, 30000), ]
+  for (i in 1:5) big <- big[big$mpg > 10, ]
+  nrow(big)
+})
+```
+
+**The code has to run long enough to sample.** profvis takes a snapshot every few
+milliseconds, so anything finishing in under roughly 50ms errors with "No parsing data
+available. Maybe your function was too fast?". That is not a bug — it means the thing
+you are profiling is not your bottleneck. Wrap a realistic workload, or repeat the
+operation, rather than profiling a single fast call.
+
+For comparing alternatives that are each individually fast, benchmark instead of
+profiling — `bench::mark()` repeats them and reports the distribution:
+
+```r
 library(bench)
+
 bench::mark(
   dplyr = dplyr::filter(mtcars, mpg > 20),
   base  = mtcars[mtcars$mpg > 20, ],
   check = FALSE  # skip output equality check
 )
 ```
+
+`bench::mark()` checks that all expressions return the same value unless you set
+`check = FALSE`, which is a useful guard against benchmarking two things that are not
+actually equivalent.
 
 ## Fast CSV reading: vroom / readr
 
@@ -82,8 +105,10 @@ As of purrr 1.2 there are two reasonable options. Reserve either for operations 
 the per-item work is substantial (>100ms each) — below that, the serialization
 overhead costs more than it saves.
 
-**purrr's own `in_parallel()`** (experimental, mirai-backed) keeps you in the ordinary
-`map()` call and forces dependencies to be explicit:
+**purrr's own `in_parallel()`** (experimental) keeps you in the ordinary `map()` call
+and forces dependencies to be explicit. It requires **both** `mirai` and `carrier`,
+which purrr only Suggests — installing mirai alone errors with
+`The package "carrier" (>= 0.3.0) is required for parallel map`:
 
 ```r
 mirai::daemons(4)

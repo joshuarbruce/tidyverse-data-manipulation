@@ -60,8 +60,15 @@ single value; `accumulate()` keeps the intermediate results.
 
 ## Parallel maps
 
-For CPU-bound work, wrap `.f` in `in_parallel()` (purrr ≥ 1.2, powered by mirai,
-currently experimental) to run across worker processes without leaving purrr:
+For CPU-bound work, wrap `.f` in `in_parallel()` (purrr ≥ 1.2, currently experimental)
+to run across worker processes without leaving purrr.
+
+**It needs two packages, not one.** purrr lists both `mirai` and `carrier` in
+`Suggests`, so neither arrives with purrr — install them with
+`install.packages(c("mirai", "carrier"))`. Installing only mirai, the one the
+documentation talks about, fails at the map call with
+`The package "carrier" (>= 0.3.0) is required for parallel map`. mirai runs the
+workers; carrier packages the function up to send to them.
 
 ```r
 mirai::daemons(4)   # without daemons, it silently falls back to sequential
