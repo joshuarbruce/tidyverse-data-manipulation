@@ -4,6 +4,10 @@ Tidy eval is the mechanism that lets dplyr/tidyr refer to column names without
 quoting them. Understanding the two paradigms — **data masking** and **tidy
 selection** — tells you which tools to reach for when writing your own functions.
 
+Read this when wrapping dplyr or tidyr verbs in your own functions. Passing a column
+name into a function and having it "not found" is the symptom that sends you here; the
+fix is almost always `{{ }}` or `.data[[ ]]`.
+
 ## Data masking vs tidy selection
 
 **Data masking** — columns are evaluated as if they were variables in the

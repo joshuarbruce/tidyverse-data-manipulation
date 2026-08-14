@@ -1,5 +1,16 @@
 # Joins Reference
 
+Use `join_by()` for the `by` argument — it is clearer than a character vector and it
+is the only form that supports inequality and rolling joins:
+
+```r
+left_join(orders, customers, by = join_by(customer_id))
+left_join(events, windows, by = join_by(time >= start, time < end))  # inequality
+```
+
+The older `by = c("cust_id" = "id")` character form still works but is superseded;
+`join_by(cust_id == id)` reads better and is checked at the call site.
+
 ## Join types
 
 | Function | Rows kept |

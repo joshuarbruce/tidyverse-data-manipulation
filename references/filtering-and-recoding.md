@@ -1,8 +1,53 @@
-# Recoding and Replacing Values
+# Filtering, Recoding, and Replacing Values
 
-dplyr 1.2.0 completed recoding into a family of four functions. Read this file when a
-task involves mapping values, conditional replacement, lookup tables, or migrating
-away from `case_match()` / `recode()`.
+dplyr 1.2.0 expanded the `filter()` family and completed recoding into a family of
+four. Read this file when a task involves dropping rows, combining conditions, mapping
+values, conditional replacement, lookup tables, or migrating away from `case_match()`
+/ `recode()`.
+
+## Dropping rows: `filter()` vs `filter_out()`
+
+Use `filter()` to say which rows to **keep**, `filter_out()` to say which to **drop**.
+
+Both treat `NA` like `FALSE`. Because they keep opposite sides of that test,
+`filter()` *discards* rows where the condition is `NA` while `filter_out()` *retains*
+them. That is what removes the `is.na()` guard a negated condition normally needs:
+
+```r
+df %>% filter(count != 0 | is.na(count))   # negated condition + explicit NA guard
+df %>% filter_out(count == 0)              # same result, states the intent directly
+```
+
+Both take `.by` for per-operation grouping:
+
+```r
+df %>% filter_out(n() < 3, .by = region)   # drop small groups
+```
+
+Reach for `filter_out()` whenever you catch yourself writing `!=`, `!`, or
+`%in%` with a leading `!` — the positive form is nearly always clearer, and it removes
+a whole class of NA bugs.
+
+## Combining conditions: `when_any()` / `when_all()`
+
+These are elementwise versions of `any()` and `all()`: `when_any(x, y, z)` is
+`x | y | z`, and `when_all(x, y, z)` is `x & y & z`.
+
+Their real value is inside `filter()` / `filter_out()`, where comma-separated
+arguments are otherwise combined with `&`. `when_any()` lets you write OR conditions
+at the same indentation level, without wrapping parentheses:
+
+```r
+countries %>% filter(when_any(
+  name %in% c("US", "CA") & between(score, 200, 300),
+  name %in% c("PR", "RU") & between(score, 100, 200)
+))
+```
+
+By default `NA` propagates as it does through `|` and `&`. Pass `na_rm = TRUE` to
+force a `TRUE`/`FALSE` result.
+
+## Recoding and replacing
 
 ## Choosing the right function
 

@@ -11,7 +11,7 @@ When active, Claude will:
   dplyr 1.2 `filter_out()` / `recode_values()` families) and steer away from
   deprecated ones (`case_match()`, `coord_flip()`, `..var..`)
 - Default to the tidyverse, but switch to **data.table** (or the `dtplyr` bridge) when data is large or speed is the goal — with the reasoning made explicit
-- Reach for reference files on joins, tidy evaluation, performance, and data.table when needed
+- Navigate from a short hub to whichever of the 13 reference files the task actually needs, rather than loading everything every session
 
 ## Installation
 
@@ -24,11 +24,18 @@ your-project/
         └── tidyverse-data-manipulation/
             ├── SKILL.md
             └── references/
+                ├── grouping.md
                 ├── joins.md
-                ├── recoding.md
+                ├── filtering-and-recoding.md
+                ├── reshaping.md
+                ├── import.md
+                ├── iteration.md
+                ├── strings.md
+                ├── factors-and-dates.md
+                ├── visualization.md
                 ├── tidy-eval.md
-                ├── performance.md
                 ├── data-table.md
+                ├── performance.md
                 └── sources.md
 ```
 
@@ -36,9 +43,12 @@ Or install globally under `~/.claude/skills/` so it's available in every project
 
 ## Pipe preference
 
-At the start of each session Claude will ask whether you prefer `%>%` (magrittr,
-works in all R versions) or `|>` (native, requires R ≥ 4.1). It then uses your
-choice consistently for the rest of the session.
+At the start of each session Claude will ask whether you prefer `%>%` (magrittr) or
+`|>` (native, R ≥ 4.1), then uses that choice consistently for the rest of the
+session. With no preference stated it follows the
+[tidyverse style guide](https://style.tidyverse.org/pipes.html), which recommends
+`|>`. Both are fully supported; the reference files are written in `%>%` and Claude
+converts them to your choice.
 
 ## Packages covered
 
@@ -55,15 +65,25 @@ choice consistently for the rest of the session.
 | tibble | Modern data frames |
 | data.table | High-performance manipulation for large data (with `dtplyr` bridge) |
 
-## Reference files
+## Structure
 
-Loaded on demand (not every session):
+`SKILL.md` is a navigational hub — a routing table, the core principles, the
+tidyverse-vs-data.table decision, and a quick reference of current idioms and the
+deprecated forms they replace. Everything else lives in `references/`, loaded on
+demand rather than every session:
 
+- `references/grouping.md` — `.by` vs `group_by()`, `across()`, `pick()`, `reframe()`, row-wise work, counting
 - `references/joins.md` — join types, `join_by()`, cardinality, pitfalls
-- `references/recoding.md` — `case_when()` / `replace_when()` / `recode_values()` / `replace_values()`, lookup tables, migrating off `case_match()`
+- `references/filtering-and-recoding.md` — `filter_out()`, `when_any()`/`when_all()`, the four-function recode/replace family, lookup tables, migrating off `case_match()`
+- `references/reshaping.md` — pivoting, nesting, `separate_wider_*()`, missing values
+- `references/import.md` — `read_csv()`, `col_types`, parse failures, Excel/SPSS, building tibbles
+- `references/iteration.md` — `map_*()`, `walk()`, `list_rbind()`, `in_parallel()`
+- `references/strings.md` — `str_*()`, regex, case conversion, cleaning column names
+- `references/factors-and-dates.md` — `fct_*()` ordering and lumping, date parsing, rounding, intervals
+- `references/visualization.md` — ggplot2 layers, facets, scales, themes, 4.0 deprecations
 - `references/tidy-eval.md` — `{{ }}`, `.data[[]]`, `all_of()`, `:=`
-- `references/performance.md` — profiling, vroom, dtplyr, duckdb, furrr
 - `references/data-table.md` — data.table syntax, dtplyr bridge, tidyverse↔data.table translation table
+- `references/performance.md` — profiling, vroom, dtplyr, duckdb, parallelism
 - `references/sources.md` — docs site, changelog, and repo for every package
 
 ## Keeping it up to date
