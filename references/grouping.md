@@ -152,12 +152,33 @@ This is a documented deliberate choice, not a bug, but it surprises people who a
 grouping applies uniformly. It matters whenever sort order is load-bearing — before
 `slice_head()`, before `fill()`, or when computing `lag()`/`lead()` within a group.
 
+`arrange()` also always sorts `NA` to the end, **even under `desc()`**:
+
+```r
+arrange(df, v)        # 1, 2, NA
+arrange(df, desc(v))  # 2, 1, NA   <- not NA first
+```
+
+That is usually what you want, but it means "the last row" is not reliably the largest
+value when the column has missing data.
+
 ## `across()` — one function, many columns
 
 ```r
 df %>% mutate(across(where(is.character), str_trim))
-df %>% summarise(across(starts_with("val_"), mean, na.rm = TRUE), .by = group)
+df %>% summarise(across(starts_with("val_"), \(x) mean(x, na.rm = TRUE)), .by = group)
 ```
+
+**Pass extra arguments with a lambda, not through `...`.** The `...` argument of
+`across()` was deprecated in dplyr 1.1.0:
+
+```r
+across(a:b, mean, na.rm = TRUE)        # deprecated — warns
+across(a:b, \(x) mean(x, na.rm = TRUE)) # current
+```
+
+A bare function name with no extra arguments (`across(where(is.character), str_trim)`)
+is still fine.
 
 Several functions at once, with control over output names:
 

@@ -52,8 +52,36 @@ inner_join(a, b, by = join_by(id),
 ## Handling unmatched rows
 
 ```r
-left_join(a, b, by = join_by(id), unmatched = "error")  # error if any b key has no match in a
+left_join(a, b, by = join_by(id), unmatched = "error")
 ```
+
+**`unmatched` guards the side whose rows would be dropped — not the side that gets
+`NA`s.** This is the opposite of what most people assume, and it is the difference
+between catching a broken lookup table and missing it entirely.
+
+In a `left_join()`, every row of `x` is kept no matter what, so `unmatched = "error"`
+says nothing about them; it errors only when a row of `y` finds no match and is
+therefore discarded ("Each row of `y` must be matched by `x`"):
+
+```r
+x <- tibble(id = c(1, 2))   # id 2 has no match in y
+y <- tibble(id = c(1, 3))   # id 3 has no match in x
+
+left_join(x, y, by = join_by(id), unmatched = "error")
+#> Error: Each row of `y` must be matched by `x`   <- about id 3, not id 2
+```
+
+So the common worry — "did my lookup table cover every row of my main table?" — is
+**not** what `unmatched = "error"` checks in a left join. Row `id = 2` still silently
+becomes `NA`. Use `anti_join()` for that:
+
+```r
+anti_join(x, y, by = join_by(id))   # rows of x with no match — the real check
+```
+
+`inner_join()` drops from both sides, so `unmatched = "error"` there checks both.
+`right_join()` checks `x`. Match the tool to the question: `unmatched` for rows being
+dropped, `anti_join()` for rows being `NA`-filled, `relationship` for row counts.
 
 ## Pitfalls
 

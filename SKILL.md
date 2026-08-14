@@ -161,6 +161,7 @@ result, and read the linked reference when the task touches one.
 | `NA` conditions drop rows in `filter()` | Data lost without warning | [filtering-and-recoding.md](references/filtering-and-recoding.md) |
 | base `ifelse()` strips class | Dates become numbers | [filtering-and-recoding.md](references/filtering-and-recoding.md) |
 | `geom_bar()` counts rows; `geom_col()` plots values | Valid-looking chart, wrong heights | [visualization.md](references/visualization.md) |
+| `unmatched = "error"` guards the *dropped* side, not the `NA` side | Broken lookup table goes undetected | [joins.md](references/joins.md) |
 | `dt2 <- dt` aliases; `:=` then edits both | Original table mutated unexpectedly | [data-table.md](references/data-table.md) |
 | `setkey()` reorders rows in place | Original row order lost; `dt[1]` changes meaning | [data-table.md](references/data-table.md) |
 

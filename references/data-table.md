@@ -340,6 +340,39 @@ tidyr's `pivot_longer()` errors on the same input. If you are translating a pipe
 between the two, this is a place where the data.table version keeps going and produces
 a silently stringified column.
 
+### Loading data.table masks lubridate's date accessors
+
+This one bites precisely because mixing is recommended — `fread()` is worth using
+inside an otherwise-tidyverse script, and the `library(data.table)` that enables it
+also masks **twelve** lubridate functions:
+
+```
+hour  isoweek  isoyear  mday  minute  month
+quarter  second  wday  week  yday  year
+```
+
+data.table's versions are plain numeric extractors with no `label`, `abbr`, or
+`week_start` arguments, so lubridate idioms break as soon as data.table is attached
+second:
+
+```r
+library(lubridate)
+month(d, label = TRUE)   # "Mar"
+
+library(data.table)
+month(d, label = TRUE)   # Error: unused argument (label = TRUE)
+```
+
+It fails loudly, which is the good case — but the failure appears far from the
+`library()` call that caused it. Qualify explicitly (`lubridate::month(d, label = TRUE)`)
+in any script that loads both, or load data.table *before* the tidyverse so the
+tidyverse wins.
+
+data.table also masks three dplyr functions: **`between()`, `first()`, `last()`**.
+These behave the same for ordinary positional use, so nothing breaks silently — but the
+argument names differ (`lower`/`upper` versus `left`/`right`), so a named call like
+`between(x, left = 1, right = 10)` fails once data.table is attached.
+
 ### Smaller traps
 
 - **`.()` is `list()`** — forgetting it in `j` changes the return type. `dt[, x]`

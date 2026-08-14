@@ -45,11 +45,11 @@ all_data <- files %>%
 ## Multiple inputs, and side effects
 
 ```r
-map2(x, y, \(a, b) a + b)          # two inputs, in parallel
-pmap(list(x, y, z), \(a, b, c) …)  # any number of inputs
-imap(x, \(val, nm) …)              # value and its name/index
+map2(x, y, \(a, b) a + b)                 # two inputs, in parallel
+pmap(list(x, y, z), \(a, b, c) a + b + c) # any number of inputs
+imap(x, \(val, nm) paste(nm, val))        # value and its name/index
 
-walk(paths, \(p) write_csv(df, p)) # side effects; returns input invisibly
+walk(paths, \(p) write_csv(df, p))        # side effects; returns input invisibly
 ```
 
 `keep()` / `discard()` filter a list by a predicate; `reduce()` collapses it to a
