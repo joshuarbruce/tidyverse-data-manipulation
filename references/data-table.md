@@ -89,6 +89,12 @@ dt[, head(.SD, 2), by = origin]                 # first 2 rows of each group
 dt[, .SD[which.max(arr_delay)], by = origin]    # the worst-delay row per group
 ```
 
+`.SD` **excludes the `by` columns**, so `lapply(.SD, mean)` will not try to average
+the grouping variable. The grouping columns still appear in the result — data.table
+prepends them — which makes it look as though they were included. Naming `.SDcols`
+explicitly is still worth doing: it documents intent and avoids silently picking up
+new columns if the table gains any later.
+
 ### Special symbols
 
 Inside `j` and `by`, data.table provides shorthand symbols. Knowing these unlocks
@@ -251,13 +257,105 @@ the absolute lowest overhead, or you're maintaining an existing data.table codeb
 
 ## Gotchas
 
-- **`:=` mutates in place.** The original object changes even without reassignment.
-  `copy()` first if you need to preserve it.
-- **`.()` is `list()`** — forgetting it in `j` changes the return type.
-- **Auto-printing** — a data.table created or modified inside a function may not
-  print; add a trailing `dt[]` to force it.
-- **Type coercion in `:=`** — assigning a double into an integer column can warn or
-  truncate; match types or create the column fresh.
+data.table's reference semantics are what make it fast, and they are also the source
+of every serious surprise in this section. Coming from the tidyverse — where every
+verb returns a new data frame — the mental model has to change: **`:=` and every
+`set*()` function modify an existing object rather than producing a new one.**
+
+### Assignment does not copy
+
+This is the trap that costs the most debugging time. `dt2 <- dt` creates a second
+name for the *same* table, not a copy:
+
+```r
+dt  <- data.table(x = 1:3)
+dt2 <- dt
+dt2[, y := 99]
+
+names(dt)     # "x" "y"  <- the ORIGINAL changed too
+```
+
+`copy()` is the only way to get an independent table:
+
+```r
+dt3 <- copy(dt)
+dt3[, z := 1]   # dt is untouched
+```
+
+Nothing warns, and the code reads exactly like the tidyverse equivalent that would be
+safe. Assume any `<-` between data.tables is an alias until you have written `copy()`.
+
+### Functions modify their caller's table
+
+The same semantics reach across function boundaries. A function that takes a
+data.table and uses `:=` changes the object the caller passed in, even if it returns
+nothing:
+
+```r
+add_flag <- function(d) {
+  d[, flag := TRUE]
+  invisible(NULL)
+}
+
+dt <- data.table(x = 1:2)
+add_flag(dt)
+names(dt)   # "x" "flag"  <- modified from inside the function
+```
+
+That is often the *point* — it avoids copying a large table — but it must be
+deliberate. If a function should not mutate its input, `copy()` on entry. Document
+which of your functions mutate; a reader cannot tell from the call site.
+
+**`setDT()` converts in place; `as.data.table()` copies.** `setDT(df)` turns the
+caller's `data.frame` into a data.table without copying, which is efficient but means
+`df` is no longer a `data.frame` afterwards.
+
+### `setkey()` reorders rows in place
+
+Setting a key physically sorts the table — the original row order is gone, silently:
+
+```r
+dt <- data.table(id = c(3L, 1L, 2L))
+setkey(dt, id)
+dt$id   # 1 2 3
+```
+
+If anything downstream depends on the incoming order — a row number recorded earlier,
+a positional join, `dt[1]` — it now means something different. `dt[1]` is always a
+*row* index, never a key lookup, so it silently returns a different row after keying.
+Use `setorder()` when you want sorting without a key, and capture the original order in
+a column first if you need to restore it.
+
+### `melt()` coerces mixed types where tidyr errors
+
+Melting columns of different types does not fail — data.table warns and coerces
+everything to the highest type in its hierarchy, usually `character`:
+
+```r
+melt(dt, id.vars = "id", measure.vars = c("num", "chr"))
+# warning: 'measure.vars' are not all of the same type ... will be of type 'character'
+```
+
+tidyr's `pivot_longer()` errors on the same input. If you are translating a pipeline
+between the two, this is a place where the data.table version keeps going and produces
+a silently stringified column.
+
+### Smaller traps
+
+- **`.()` is `list()`** — forgetting it in `j` changes the return type. `dt[, x]`
+  returns a vector; `dt[, .(x)]` returns a data.table.
+- **Auto-printing is suppressed after `:=`.** At the console, `dt[, y := 2]` prints
+  nothing at all. Append `[]` — `dt[, y := 2][]` — to force it. This also affects
+  tables built or modified inside functions.
+- **Type coercion in `:=` differs by scope.** Replacing a whole column promotes its
+  type silently (`dt[, i := i + 0.5]` turns an integer column into a double). Assigning
+  into a *subset* cannot change the column type, so it truncates and warns:
+  `dt[1, i := 1.5]` warns "truncated (precision lost)" and stores `1`. Assigning a
+  character into a numeric column also warns and coerces. Treat any coercion warning
+  from `:=` as a real bug, not noise.
+- **`:=` does not recycle silently.** Supplying 2 values for 3 rows errors, and so does
+  2 for 4 — data.table requires `rep()` to make recycling explicit. This one is a
+  safety feature, not a trap.
 
 ## Sources & further reading
 
