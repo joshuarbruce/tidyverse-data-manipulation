@@ -34,8 +34,10 @@ vroom(c(readr::readr_example("mini-gapminder-africa.csv"),
 
 ## dtplyr — dplyr syntax over data.table
 
-For datasets in the 1–10 GB range, `dtplyr` lets you write standard dplyr code
-that gets translated to `data.table` operations automatically:
+As a rule of thumb, once a dataset is large enough that dplyr feels slow but still
+fits comfortably in memory, `dtplyr` lets you write standard dplyr code that gets
+translated to `data.table` operations automatically. Benchmark rather than guess at
+the crossover — it depends far more on the operation than on file size:
 
 ```r
 library(dtplyr)
@@ -58,15 +60,18 @@ and integrates with dplyr via `duckplyr` or direct SQL:
 library(duckdb)
 library(dplyr)
 
-con <- dbConnect(duckdb())
-duckdb_read_csv(con, "sales", "sales.csv")
+path <- tempfile(fileext = ".csv")
+readr::write_csv(mtcars, path)
 
-tbl(con, "sales") %>%
-  filter(year >= 2020) %>%
-  summarise(total = sum(amount), .by = region) %>%
+con <- dbConnect(duckdb())
+duckdb_read_csv(con, "cars", path)
+
+tbl(con, "cars") %>%
+  filter(mpg > 20) %>%
+  summarise(mean_hp = mean(hp), .by = cyl) %>%
   collect()
 
-dbDisconnect(con)
+dbDisconnect(con, shutdown = TRUE)
 ```
 
 DuckDB can query Parquet, CSV, and JSON files directly without loading into memory.

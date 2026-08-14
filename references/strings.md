@@ -54,7 +54,7 @@ tibble(`Total Revenue` = 1, `Unit Count` = 2) %>% rename_with(str_to_snake)
 Every `str_*` function returns `NA` for `NA` input — including the predicates:
 
 ```r
-str_detect(c("apple", NA, "banana"), "an")   # TRUE, NA, TRUE
+str_detect(c("apple", NA, "banana"), "an")   # FALSE, NA, TRUE
 ```
 
 Because `filter()` treats `NA` as `FALSE`, a `str_detect()` condition silently drops

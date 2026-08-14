@@ -38,7 +38,7 @@ no warning. This bites most often with `str_detect()`, which propagates `NA`:
 
 ```r
 s <- tibble(x = c("apple", NA, "banana"))
-stringr::str_detect(s$x, "an")            # TRUE, NA, TRUE
+stringr::str_detect(s$x, "an")            # FALSE, NA, TRUE
 
 s %>% filter(stringr::str_detect(x, "an"))      # 1 row — the NA row is gone
 s %>% filter_out(stringr::str_detect(x, "an"))  # 2 rows — the NA row is kept

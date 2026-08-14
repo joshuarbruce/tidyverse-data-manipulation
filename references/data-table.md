@@ -124,8 +124,11 @@ dt[hp > 100, .(avg = mean(mpg)), by = cyl][order(-avg)]
 
 Setting a **key** physically reorders the table by one or more columns (by
 reference, in place). Subsetting on a keyed column then uses **binary search**
-(O(log n)) instead of a full vector scan — the keys vignette shows a ~489× speedup
-on 20M rows. Keys are the main reason data.table is fast for repeated lookups.
+(O(log n)) instead of a full vector scan. The
+[keys vignette](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-keys-fast-subset.html)
+measures a **~215× speed-up** for a two-column subset of a 20-million-row, ~380 MiB
+table (0.215s scanning versus effectively 0s keyed). Keys are the main reason
+data.table is fast for repeated lookups.
 
 ```r
 setkey(dt, cyl)                    # key by one column (unquoted)
