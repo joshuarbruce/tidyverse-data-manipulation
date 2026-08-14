@@ -82,6 +82,21 @@ feel dated.
 | furrr (parallel purrr) | https://furrr.futureverse.org/ | https://github.com/futureverse/furrr |
 | bench (benchmarking) | https://bench.r-lib.org/ | https://github.com/r-lib/bench |
 | profvis (profiling) | https://profvis.r-lib.org/ | https://github.com/r-lib/profvis |
+| mirai (backs `purrr::in_parallel()`) | https://mirai.r-lib.org/ | https://github.com/r-lib/mirai |
+
+## Design proposals (tidyups)
+
+Tidyups are the design documents behind cross-package API changes. They explain *why*
+an interface changed, which is often more useful than the changelog entry:
+
+| Tidyup | Covers | URL |
+|---|---|---|
+| Tidyup 7 | Recoding and replacing values (`recode_values()`, `replace_values()`, `replace_when()`) | https://github.com/tidyverse/tidyups/blob/main/007-tidyverse-recoding-and-replacing.md |
+| Tidyup 8 | Expanding the `filter()` family (`filter_out()`, `when_any()`, `when_all()`) | https://github.com/tidyverse/tidyups/pull/30 |
+| All tidyups | Index of accepted and proposed design changes | https://github.com/tidyverse/tidyups |
+
+The dplyr vignette `vignette("recoding-replacing")` is the practical companion to
+Tidyup 7 and the best single explanation of which of the four functions to reach for.
 
 ## Meta & learning
 
@@ -112,8 +127,18 @@ proprietary content.
 
 ## Last verified
 
-Package URLs were verified reachable on **2026-06-27**. If a docs link 404s, the
-package may have been renamed, retired, or moved orgs — check the
-[tidyverse blog](https://www.tidyverse.org/blog/) or search the
+Two different things can be "verified" here, and conflating them is how a skill goes
+stale while looking current. Record both:
+
+- **URLs reachable** — every link above resolves: **2026-08-14**
+- **Content reconciled** — `SKILL.md` guidance checked against each package's current
+  changelog and corrected: **2026-08-14**
+
+Versions current at the last content reconciliation: dplyr 1.2.1, tidyr 1.3.2,
+ggplot2 4.0.3, purrr 1.2.2, stringr 1.6.0, readr 2.2.0, forcats 1.0.1, tibble 3.3.1,
+lubridate 1.9.5, data.table 1.18.4, dtplyr 1.3.2.
+
+If a docs link 404s, the package may have been renamed, retired, or moved orgs —
+check the [tidyverse blog](https://www.tidyverse.org/blog/) or search the
 [r-lib](https://github.com/r-lib) and [tidyverse](https://github.com/tidyverse)
 GitHub organizations.

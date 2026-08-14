@@ -71,9 +71,21 @@ dbDisconnect(con)
 
 DuckDB can query Parquet, CSV, and JSON files directly without loading into memory.
 
-## Parallel processing with purrr + furrr
+## Parallel processing
 
-For CPU-bound map operations:
+As of purrr 1.2 there are two reasonable options. Reserve either for operations where
+the per-item work is substantial (>100ms each) — below that, the serialization
+overhead costs more than it saves.
+
+**purrr's own `in_parallel()`** (experimental, mirai-backed) keeps you in the ordinary
+`map()` call and forces dependencies to be explicit:
+
+```r
+mirai::daemons(4)
+results <- map(file_list, in_parallel(\(f) process(f), process = process))
+```
+
+**furrr** mirrors purrr's API with a `future_` prefix and is the mature option:
 
 ```r
 library(furrr)
@@ -82,9 +94,15 @@ plan(multisession, workers = 4)  # use 4 cores
 results <- future_map(file_list, read_and_process)
 ```
 
-`furrr` mirrors `purrr`'s API with a `future_` prefix. Reserve it for operations
-where the per-item work is substantial (>100ms each) — the overhead isn't worth it
-for fast operations.
+Prefer `in_parallel()` for new code in a purrr-centric pipeline; prefer furrr when you
+already use the futureverse elsewhere or need its established plan backends.
+
+## dplyr 1.2 recoding performance
+
+`if_else()`, `case_when()`, and `coalesce()` were rewritten in C via vctrs in dplyr
+1.2.0 — substantially faster and much lighter on memory. If you previously dropped to
+`data.table::fifelse()` / `fcase()` purely for speed on recoding-heavy pipelines,
+re-benchmark before assuming that's still necessary.
 
 ## General tips
 

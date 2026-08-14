@@ -79,16 +79,20 @@ tidyverse↔data.table translation table. Don't silently switch paradigms mid-sc
 Core verbs: `filter()`, `select()`, `mutate()`, `summarise()`, `arrange()`,
 `rename()`, `relocate()`, `slice_*()`.
 
-**Grouping** — prefer the `.by` argument (dplyr ≥ 1.1) for per-operation grouping;
-it avoids forgetting `ungroup()` and is explicit at the call site:
+**Grouping** — prefer the `.by` argument for per-operation grouping; it avoids
+forgetting `ungroup()` and is explicit at the call site. Introduced in dplyr 1.1 and
+**stable as of dplyr 1.2.0**:
 
 ```r
-# preferred (dplyr ≥ 1.1)
+# preferred
 df %>% summarise(mean_val = mean(x), .by = group_col)
 
 # older style — still fine, just remember ungroup()
 df %>% group_by(group_col) %>% summarise(mean_val = mean(x)) %>% ungroup()
 ```
+
+Use `reframe()` (also stable as of 1.2.0) when a summary returns more than one row
+per group — `summarise()` expects a single value per group.
 
 **Multi-column operations** — use `across()` to apply a function to several
 columns at once:
@@ -109,6 +113,76 @@ Use the `relationship` argument to declare expected cardinality and catch surpri
 ```r
 inner_join(a, b, by = join_by(id), relationship = "many-to-one")
 ```
+
+**Dropping rows** — use `filter()` to say which rows to *keep*, `filter_out()`
+(dplyr ≥ 1.2) to say which rows to *drop*. Both treat `NA` like `FALSE`, but that
+means `filter()` discards `NA` rows while `filter_out()` retains them — so
+`filter_out()` removes the `is.na()` guard that negated conditions usually need:
+
+```r
+df %>% filter(count != 0 | is.na(count))   # negated condition + explicit NA guard
+df %>% filter_out(count == 0)              # same result, states the intent directly
+```
+
+**Combining conditions** — `when_any()` / `when_all()` are elementwise `any()` /
+`all()`: `when_any(x, y, z)` is `x | y | z`. They shine inside `filter()` /
+`filter_out()`, where comma-separated arguments are otherwise combined with `&`:
+
+```r
+countries %>% filter(when_any(
+  name %in% c("US", "CA") & between(score, 200, 300),
+  name %in% c("PR", "RU") & between(score, 100, 200)
+))
+```
+
+By default `NA` propagates as it does through `|` and `&`; use `na_rm = TRUE` to
+force a `TRUE`/`FALSE` result.
+
+**Recoding and replacing** — dplyr 1.2 completes this into a family of four. Pick by
+answering two questions: are you matching *conditions* or *values*, and are you
+building a *new* vector or *updating* an existing one?
+
+| | Match on conditions | Map old values to new |
+|---|---|---|
+| **Create** a new vector | `case_when()` | `recode_values()` |
+| **Update** an existing vector | `replace_when()` | `replace_values()` |
+
+```r
+# create: every value mapped
+score %>% recode_values(1 ~ "low", 2 ~ "mid", 3 ~ "high")
+
+# update: only the named values change, the rest pass through unchanged
+name %>% replace_values(c("UNC", "Chapel Hill") ~ "UNC Chapel Hill")
+
+# update by condition, preserving type
+pets %>% mutate(type = replace_when(type, type == "dog" & age <= 2 ~ "puppy"))
+```
+
+`recode_values()` / `replace_values()` also accept `from` and `to` vectors, so an
+existing lookup table can be used directly instead of hand-written formulas:
+
+```r
+recode_values(state, from = lookup$abbr, to = lookup$name)
+```
+
+When you believe every case is handled, prefer `unmatched = "error"` over supplying a
+default — it fails loudly instead of silently bucketing surprises:
+
+```r
+# errors if score contains anything other than 1 or 2
+recode_values(score, 1 ~ "low", 2 ~ "mid", unmatched = "error")
+```
+
+Two traps worth remembering:
+
+- **Argument prefixes differ.** `case_when()` takes dot-prefixed arguments
+  (`.default`, `.unmatched`, `.ptype`, `.size`); `recode_values()` and
+  `replace_values()` take undotted ones (`default`, `unmatched`, `ptype`, `from`,
+  `to`). The two `replace_*()` functions need no default at all — unmatched values
+  keep their original value, which is the whole point of an update.
+- **`case_match()` is deprecated** as of dplyr 1.2.0 and warns on use. It is fully
+  replaced by `recode_values()` (and `replace_values()` for partial updates). The older
+  `recode()` is superseded by the same pair.
 
 **Row operations** — `rowwise()` + `c_across()` for row-level summaries; prefer
 vectorized alternatives when they exist.
@@ -136,6 +210,12 @@ df %>%
 `separate()`.
 
 `complete()` + `fill()` for explicit missing values; `drop_na()` for row removal.
+`fill()` takes `.by` (tidyr ≥ 1.3.2), so carrying values forward within a group no
+longer needs `group_by()`:
+
+```r
+df %>% fill(value, .direction = "down", .by = station)
+```
 
 ### ggplot2 — visualization
 
@@ -157,6 +237,13 @@ Key patterns:
 - `theme()` for fine-grained layout control; `theme_minimal()` / `theme_bw()` as
   clean starting points.
 - `labs()` to set all titles, axis labels, and legend titles in one call.
+
+Avoid these older forms (ggplot2 4.0 formalized the deprecations):
+
+- `..var..` and `stat()` inside `aes()` → use `after_stat(var)`.
+- `qplot()` → build the plot with `ggplot()` + geoms.
+- `coord_flip()` → set `orientation = "y"` on the geom instead.
+- `geom_errorbarh()` → `geom_errorbar(orientation = "y")`.
 
 ### readr — data import
 
@@ -186,8 +273,32 @@ combined <- map(file_list, read_csv) %>% list_rbind()
 `walk()` for side effects (writing files, printing). `map2()` / `pmap()` for
 multiple inputs. `keep()` / `discard()` for filtering lists.
 
-Note: `map_dfr()` and `map_dfc()` are superseded — use `map() %>% list_rbind()`
-and `map() %>% list_cbind()` instead.
+For CPU-bound work, wrap `.f` in `in_parallel()` (purrr ≥ 1.2, powered by mirai,
+currently experimental) to run a map across worker processes without leaving purrr:
+
+```r
+mirai::daemons(4)   # without daemons, it silently falls back to sequential
+
+results <- map(files, in_parallel(
+  \(f) process(readr::read_csv(f)),
+  process = process          # declare every dependency explicitly
+))
+```
+
+The wrapped function is serialized and shipped to another process, so it must be
+self-contained: call package functions with a `::` prefix, and pass any local
+function or data it needs as a named argument to `in_parallel()`. That isolation is
+the point — it stops large objects from being captured by accident.
+
+Notes on superseded and changed behavior:
+
+- `map_dfr()` and `map_dfc()` are superseded — use `map() %>% list_rbind()` and
+  `map() %>% list_cbind()` instead.
+- `flatten()` is superseded by `list_flatten()` / `list_c()`; `transpose()` by
+  `list_transpose()`.
+- **purrr 1.2 tightened `map_chr()`**: it no longer silently coerces logical, integer,
+  or double to string, and now errors instead. Wrap the value in `as.character()`, or
+  use `map_vec()` when the output type should follow the input.
 
 ### stringr — strings
 
@@ -204,6 +315,23 @@ str_c("Hello", name, sep = " ")   # concatenate
 str_glue("Hello {name}!")         # interpolation
 str_trim(x)                       # strip whitespace
 str_pad(x, width = 5, pad = "0")  # pad to width
+```
+
+stringr 1.6 added case converters for naming conventions and a case-insensitive
+SQL-style matcher:
+
+```r
+str_to_snake("Total Revenue ($USD)")  # "total_revenue_usd"
+str_to_camel(x)                       # "totalRevenue"
+str_to_kebab(x)                       # "total-revenue"
+str_ilike(x, "app%")                  # SQL ILIKE — case-insensitive wildcard match
+```
+
+`str_to_snake()` is the right tool for normalizing column names on import, and it
+matches this skill's snake_case convention:
+
+```r
+df %>% rename_with(str_to_snake)
 ```
 
 Prefer `str_*` over base `gsub()` / `grep()` / `paste()` — the consistent API

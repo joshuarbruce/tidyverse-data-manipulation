@@ -7,7 +7,9 @@ A Claude Code skill for R data manipulation using the tidyverse ecosystem.
 When active, Claude will:
 - Write idiomatic, modern tidyverse code (dplyr, tidyr, ggplot2, purrr, stringr, forcats, lubridate, tibble, readr)
 - Ask your pipe preference (`%>%` vs `|>`) at the start of a session and stay consistent
-- Apply current best practices (`.by` grouping, `join_by()`, `list_rbind()`, etc.)
+- Apply current best practices (`.by` grouping, `join_by()`, `list_rbind()`, and the
+  dplyr 1.2 `filter_out()` / `recode_values()` families) and steer away from
+  deprecated ones (`case_match()`, `coord_flip()`, `..var..`)
 - Default to the tidyverse, but switch to **data.table** (or the `dtplyr` bridge) when data is large or speed is the goal — with the reasoning made explicit
 - Reach for reference files on joins, tidy evaluation, performance, and data.table when needed
 
@@ -24,7 +26,9 @@ your-project/
             └── references/
                 ├── joins.md
                 ├── tidy-eval.md
-                └── performance.md
+                ├── performance.md
+                ├── data-table.md
+                └── sources.md
 ```
 
 Or install globally under `~/.claude/skills/` so it's available in every project.
@@ -63,10 +67,13 @@ Loaded on demand (not every session):
 ## Keeping it up to date
 
 `references/sources.md` lists the canonical docs, changelog (`/news/index.html`),
-and GitHub repo for every package the skill covers. The
+and GitHub repo for every package the skill covers, plus the tidyups (design
+proposals) behind recent API changes. The
 [tidyverse blog](https://www.tidyverse.org/blog/) is the central feed for release
 announcements. When a release supersedes or deprecates a pattern, update `SKILL.md`
-and bump the "Last verified" date in `references/sources.md`.
+and bump the "Last verified" dates in `references/sources.md` — that section tracks
+*URLs reachable* and *content reconciled* separately, because a link check alone does
+not tell you whether the guidance is still current.
 
 ## Credits
 
