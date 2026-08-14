@@ -27,9 +27,14 @@ Both take `.by` for per-operation grouping:
 starwars %>% filter_out(n() < 3, .by = species)   # drop species with fewer than 3
 ```
 
-Reach for `filter_out()` whenever you catch yourself writing `!=`, `!`, or
-`%in%` with a leading `!` — the positive form is nearly always clearer, and it removes
-a whole class of NA bugs.
+Reach for `filter_out()` whenever you catch yourself negating a condition. Two
+different benefits, worth keeping straight:
+
+- With `!=` or `!` on a comparison, it **fixes an NA bug**: `filter(x != 1)` drops the
+  `NA` rows, `filter_out(x == 1)` keeps them.
+- With `%in%`, it is **only clearer, not safer** — `%in%` returns `FALSE` rather than
+  `NA` for missing values, so `filter(!(x %in% v))` and `filter_out(x %in% v)` return
+  exactly the same rows.
 
 ### Conditions that return `NA` silently drop rows
 
@@ -80,20 +85,20 @@ force a `TRUE`/`FALSE` result.
 
 ## Recoding and replacing
 
-## Choosing the right function
-
-Two questions decide it: are you matching on **conditions** or on **values**, and are
-you building a **new** vector or **updating** an existing one?
+Two questions decide which of the four functions you want: are you matching on
+**conditions** or on **values**, and are you building a **new** vector or **updating**
+an existing one?
 
 | | Match on conditions | Map old values to new |
 |---|---|---|
 | **Create** a new vector | `case_when()` | `recode_values()` |
 | **Update** an existing vector | `replace_when()` | `replace_values()` |
 
-The distinction that matters most: the `case_*`/`recode_*` pair needs to account for
-every input (via a default), while the `replace_*` pair leaves anything unmatched at
-its original value. Reaching for a `replace_*()` function is usually what people
-actually mean when they write a `case_when()` ending in `.default = x`.
+The distinction that matters most is what happens to inputs you did not mention. The
+`case_*`/`recode_*` pair returns `NA` for them unless you supply a default — no error,
+just missing values appearing where you did not expect them. The `replace_*` pair
+leaves them at their original value. Reaching for a `replace_*()` function is usually
+what people actually mean when they write a `case_when()` ending in `.default = x`.
 
 ## Signatures
 
@@ -113,9 +118,9 @@ no default at all — unmatched values keep their original value by definition.
 ## Creating a new vector
 
 ```r
-x <- 1:20
+x <- 1:70   # needs to reach 35 for the first branch to fire at all
 
-# condition-based
+# condition-based — first match wins, so order the branches most specific first
 case_when(
   x %% 35 == 0 ~ "fizz buzz",
   x %% 5  == 0 ~ "fizz",
@@ -190,8 +195,8 @@ them while you can still fix the mapping:
 recode_values(c(1, 2, 3), 1 ~ "low", 2 ~ "mid", unmatched = "error")
 ```
 
-`case_when()` has the same argument as `.unmatched = "error"`. Use it in pipelines
-where an unmapped category is a data-quality signal rather than an expected case.
+`case_when()` offers the same guard, spelled `.unmatched = "error"` with the dot. Use
+it wherever an unmapped category is a data-quality signal rather than an expected case.
 
 ## Traps
 
@@ -219,9 +224,15 @@ case_when(x > 0 ~ sqrt(x), .default = 0)   # warns "NaNs produced" — sqrt(-1) 
 ```
 
 The result is correct — unmatched rows take the default — but the warning is real and
-signals wasted computation on values you filtered against. When a branch genuinely
-cannot be evaluated on all rows, guard the input instead of the output, or use
-`replace_when()` so untouched values are never recomputed.
+signals wasted computation on values you thought the condition excluded.
+**`replace_when()` behaves the same way**; it is not a way out. The fix is to guard the
+*input* so every branch is safe to evaluate everywhere:
+
+```r
+case_when(x > 0 ~ sqrt(pmax(x, 0)), .default = 0)   # no warning
+```
+
+Or filter the offending rows out before recoding.
 
 ## Migrating from older functions
 
