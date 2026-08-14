@@ -68,15 +68,31 @@ totals %>% mutate(pct = total / sum(total))   # pct within region, not overall
 ```
 
 **`summarise()` removes only the last grouping variable**, so grouping by two columns
-leaves the result grouped by the first. dplyr says so in a message, which is easy to
-miss in a long script. Be explicit instead:
+leaves the result grouped by the first. This is documented, not a quirk — `?summarise`
+states that `.groups` defaults to `"drop_last"`, described as "drops the last level of
+grouping. This was the only supported option before version 1.0.0."
+
+Be explicit rather than relying on the default:
 
 ```r
 df %>% group_by(region, year) %>% summarise(total = sum(sales), .groups = "drop")
 ```
 
-`.groups` accepts `"drop"` (ungrouped — usually what you want), `"drop_last"` (the
-default), or `"keep"`.
+`.groups` (still marked experimental) accepts:
+
+| Value | Result |
+|---|---|
+| `"drop"` | Fully ungrouped — usually what you want |
+| `"drop_last"` | Drops the last grouping level (the default) |
+| `"keep"` | Same grouping as the input |
+| `"rowwise"` | Each row its own group |
+
+**Do not rely on the message to catch this.** dplyr informs you how the result is
+grouped, but the docs list three cases where it stays silent — when the result is
+already ungrouped, when `options(dplyr.summarise.inform = FALSE)` is set, and **when
+`summarise()` is called from a function inside a package**. The last two are exactly
+the situations where a silently grouped result travels furthest before anyone notices,
+and plenty of projects set that option globally to quiet their logs.
 
 None of this applies to `.by`, which never returns grouped data — that is the main
 reason to prefer it:
