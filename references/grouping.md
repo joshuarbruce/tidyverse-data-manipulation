@@ -10,8 +10,10 @@ several columns.
 the grouping applies to a single verb:
 
 ```r
-df %>% summarise(mean_val = mean(x), .by = group_col)
-df %>% summarise(n = n(), .by = c(region, year))     # multiple grouping columns
+library(dplyr)
+
+starwars %>% summarise(avg_height = mean(height, na.rm = TRUE), .by = species)
+starwars %>% summarise(n = n(), .by = c(species, gender))   # multiple grouping columns
 ```
 
 **`.by` always returns ungrouped data.** Never write `ungroup()` after it — there is
@@ -19,10 +21,10 @@ nothing to undo:
 
 ```r
 # correct
-df %>% summarise(total = sum(x), .by = region)
+starwars %>% summarise(n = n(), .by = species)
 
 # redundant — the result was never grouped
-df %>% summarise(total = sum(x), .by = region) %>% ungroup()
+starwars %>% summarise(n = n(), .by = species) %>% ungroup()
 ```
 
 Unlike `group_by()`, `.by` does not sort the result. Add `arrange()` if order matters.
@@ -32,10 +34,10 @@ Unlike `group_by()`, `.by` does not sort the result. Add `arrange()` if order ma
 Use `group_by()` when the grouping must **persist across several verbs**:
 
 ```r
-df %>%
-  group_by(patient_id) %>%
-  filter(visit == max(visit)) %>%
-  mutate(days_since_first = as.numeric(visit_date - min(visit_date))) %>%
+starwars %>%
+  group_by(species) %>%
+  filter(!is.na(height)) %>%
+  mutate(height_vs_species_max = height - max(height)) %>%
   ungroup()
 ```
 
@@ -52,19 +54,20 @@ runs next. `ungroup()` is the only thing that clears it.
 Inspect it when unsure:
 
 ```r
-group_vars(df)   # character vector of grouping columns, empty if ungrouped
-n_groups(df)     # how many groups
+g <- group_by(starwars, species)
+group_vars(g)   # "species" — empty character vector if ungrouped
+n_groups(g)     # how many groups
 ```
 
 The trap is that grouped results are usually *valid*, just computed over the wrong
 scope, so nothing errors:
 
 ```r
-totals <- df %>%
-  group_by(region, year) %>%
-  summarise(total = sum(sales))     # still grouped by region!
+totals <- starwars %>%
+  group_by(species, gender) %>%
+  summarise(total = sum(height, na.rm = TRUE))   # still grouped by species!
 
-totals %>% mutate(pct = total / sum(total))   # pct within region, not overall
+totals %>% mutate(pct = total / sum(total))      # pct within species, not overall
 ```
 
 **`summarise()` removes only the last grouping variable**, so grouping by two columns
@@ -75,7 +78,9 @@ grouping. This was the only supported option before version 1.0.0."
 Be explicit rather than relying on the default:
 
 ```r
-df %>% group_by(region, year) %>% summarise(total = sum(sales), .groups = "drop")
+starwars %>%
+  group_by(species, gender) %>%
+  summarise(total = sum(height, na.rm = TRUE), .groups = "drop")
 ```
 
 `.groups` (still marked experimental) accepts:
@@ -98,7 +103,7 @@ None of this applies to `.by`, which never returns grouped data — that is the 
 reason to prefer it:
 
 ```r
-df %>% summarise(total = sum(sales), .by = c(region, year))   # 0 groups
+starwars %>% summarise(total = sum(height, na.rm = TRUE), .by = c(species, gender))
 ```
 
 Always `ungroup()` when finished with a `group_by()` chain. A silently grouped data
@@ -109,10 +114,10 @@ frame returned from a function is a classic source of wrong results downstream.
 `.by` inside `mutate()` computes per group and writes back to every row:
 
 ```r
-df %>% mutate(
-  group_mean   = mean(value),
-  pct_of_group = value / sum(value),
-  .by = region
+starwars %>% mutate(
+  species_mean = mean(height, na.rm = TRUE),
+  pct_of_max   = height / max(height, na.rm = TRUE),
+  .by = species
 )
 ```
 
@@ -122,15 +127,15 @@ separate only when the `.by` differs, or when a later column depends on an earli
 ### Grouped filter
 
 ```r
-df %>% filter(value == max(value), .by = region)   # top row(s) per region
-df %>% filter(n() >= 3, .by = region)              # keep groups with 3+ rows
+starwars %>% filter(height == max(height, na.rm = TRUE), .by = species)  # tallest per species
+starwars %>% filter(n() >= 3, .by = species)                             # groups with 3+ rows
 ```
 
 `slice_max()` / `slice_min()` are clearer when you want a fixed number of rows and
 need explicit tie handling. Note this family takes `by`, not `.by`:
 
 ```r
-df %>% slice_max(value, n = 1, by = region, with_ties = FALSE)
+starwars %>% slice_max(height, n = 1, by = species, with_ties = FALSE)
 ```
 
 **`with_ties` defaults to `TRUE`, so `n = 1` can return more than one row per group.**
@@ -144,8 +149,8 @@ kept is not arbitrary.
 Unlike every other verb, `arrange()` does **not** respect `group_by()` unless you ask:
 
 ```r
-df %>% group_by(region) %>% arrange(value)                   # sorts the whole table
-df %>% group_by(region) %>% arrange(value, .by_group = TRUE) # sorts within region
+starwars %>% group_by(species) %>% arrange(height)                   # sorts whole table
+starwars %>% group_by(species) %>% arrange(height, .by_group = TRUE) # sorts within species
 ```
 
 This is a documented deliberate choice, not a bug, but it surprises people who assume
@@ -155,8 +160,9 @@ grouping applies uniformly. It matters whenever sort order is load-bearing — b
 `arrange()` also always sorts `NA` to the end, **even under `desc()`**:
 
 ```r
-arrange(df, v)        # 1, 2, NA
-arrange(df, desc(v))  # 2, 1, NA   <- not NA first
+d <- tibble(v = c(2, NA, 1))
+arrange(d, v)$v        # 1, 2, NA
+arrange(d, desc(v))$v  # 2, 1, NA   <- not NA first
 ```
 
 That is usually what you want, but it means "the last row" is not reliably the largest
@@ -165,8 +171,8 @@ value when the column has missing data.
 ## `across()` — one function, many columns
 
 ```r
-df %>% mutate(across(where(is.character), str_trim))
-df %>% summarise(across(starts_with("val_"), \(x) mean(x, na.rm = TRUE)), .by = group)
+starwars %>% mutate(across(where(is.character), stringr::str_trim))
+starwars %>% summarise(across(c(height, mass), \(x) mean(x, na.rm = TRUE)), .by = species)
 ```
 
 **Pass extra arguments with a lambda, not through `...`.** The `...` argument of
@@ -183,7 +189,7 @@ is still fine.
 Several functions at once, with control over output names:
 
 ```r
-df %>% summarise(
+starwars %>% summarise(
   across(c(height, mass), list(mean = mean, sd = sd), .names = "{.col}_{.fn}"),
   .by = species
 )
@@ -193,7 +199,7 @@ Pass a character vector of column names through `all_of()`:
 
 ```r
 cols <- c("height", "mass")
-df %>% summarise(across(all_of(cols), mean))
+starwars %>% summarise(across(all_of(cols), \(x) mean(x, na.rm = TRUE)))
 ```
 
 ## `pick()` — select columns inside a verb
@@ -202,7 +208,7 @@ df %>% summarise(across(all_of(cols), mean))
 columns at once. It replaces the older `cur_data()` / `cur_data_all()`:
 
 ```r
-df %>% mutate(n_missing = rowSums(is.na(pick(everything()))))
+starwars %>% mutate(n_missing = rowSums(is.na(pick(everything())))) %>% select(name, n_missing)
 ```
 
 ## `reframe()` — summaries returning multiple rows
@@ -211,7 +217,9 @@ df %>% mutate(n_missing = rowSums(is.na(pick(everything()))))
 `reframe()` (stable as of dplyr 1.2.0):
 
 ```r
-df %>% reframe(q = quantile(x, c(.25, .5, .75)), .by = group)
+starwars %>%
+  filter(!is.na(height)) %>%
+  reframe(q = quantile(height, c(.25, .5, .75)), .by = gender)
 ```
 
 Fighting a "must return size 1" error from `summarise()` is the signal to switch.
@@ -223,10 +231,10 @@ alternative whenever one exists:
 
 ```r
 # rowwise — clear, but slow on large data
-df %>% rowwise() %>% mutate(total = sum(c_across(starts_with("q")))) %>% ungroup()
+mtcars %>% rowwise() %>% mutate(total = sum(c_across(c(mpg, hp)))) %>% ungroup()
 
 # vectorized — much faster
-df %>% mutate(total = rowSums(pick(starts_with("q"))))
+mtcars %>% mutate(total = rowSums(pick(c(mpg, hp))))
 ```
 
 Base R already vectorizes several of these: `rowSums()`, `rowMeans()`, `pmin()`,
@@ -236,10 +244,10 @@ function that only accepts scalars.
 ## Counting
 
 ```r
-df %>% count(region)                          # shorthand for group + tally
-df %>% count(region, sort = TRUE)             # most frequent first
-df %>% count(region, wt = sales)              # weighted
-df %>% summarise(n = n(), .by = region)       # equivalent, more explicit
+starwars %>% count(species)                        # shorthand for group + tally
+starwars %>% count(species, sort = TRUE)           # most frequent first
+starwars %>% count(species, wt = height)           # weighted
+starwars %>% summarise(n = n(), .by = species)     # equivalent, more explicit
 ```
 
 `n_distinct(x)` counts unique values. `count()` on the key columns is the quickest way

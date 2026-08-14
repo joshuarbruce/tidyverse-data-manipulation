@@ -6,9 +6,12 @@ files, controlling column parsing, or diagnosing import problems.
 ## readr — delimited files
 
 ```r
-df <- read_csv("data.csv", col_types = cols(
-  date = col_date(),
-  id   = col_character()
+library(readr)
+
+# readr ships example files, so this runs as written
+chickens <- read_csv(readr_example("chickens.csv"), col_types = cols(
+  chicken   = col_character(),
+  eggs_laid = col_integer()
 ))
 ```
 
@@ -31,8 +34,9 @@ Useful arguments:
 ### Diagnosing parse failures
 
 ```r
-df <- read_csv("data.csv")
-problems(df)     # rows/columns where parsing failed, and what was expected
+# challenge.csv is designed to break naive type guessing
+challenge <- read_csv(readr_example("challenge.csv"))
+problems(challenge)   # rows/columns where parsing failed, and what was expected
 ```
 
 `problems()` is the first thing to check when a column comes back as the wrong type or
@@ -60,7 +64,7 @@ Imported headers are rarely snake_case. Normalize them immediately, before writi
 downstream code against them:
 
 ```r
-df %>% rename_with(str_to_snake)
+tibble::tibble(`Total Revenue` = 1) %>% dplyr::rename_with(stringr::str_to_snake)
 ```
 
 See [strings.md](strings.md) for the rest of the
@@ -69,8 +73,10 @@ See [strings.md](strings.md) for the rest of the
 ## tibble — constructing data frames
 
 ```r
+library(tibble)
+
 tibble(x = 1:3, y = x * 2)     # later columns can reference earlier ones
-as_tibble(df)                  # convert a base data.frame
+as_tibble(mtcars)              # convert a base data.frame
 ```
 
 `tribble()` builds a tibble row by row, which is far more readable for small lookup

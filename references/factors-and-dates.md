@@ -11,30 +11,38 @@ order, legend order, and facet order, so reordering the factor is how you reorde
 chart:
 
 ```r
-fct_reorder(f, x)                 # order levels by another variable (median by default)
-fct_reorder(f, x, .fun = max)     # or another summary function
-fct_reorder2(f, x, y)             # order by y value at the largest x — good for line plots
-fct_infreq(f)                     # order by frequency, most common first
-fct_rev(f)                        # reverse current order
-fct_relevel(f, "ref", after = 0)  # move a level to the front (e.g. a reference level)
+library(forcats)
+library(dplyr)
+
+# gss_cat is forcats' own survey dataset
+avg <- gss_cat %>% summarise(tv = mean(tvhours, na.rm = TRUE), .by = relig)
+
+fct_reorder(avg$relig, avg$tv)              # order levels by another variable
+fct_reorder(avg$relig, avg$tv, .fun = max)  # or another summary function
+fct_infreq(gss_cat$marital)                 # order by frequency, most common first
+fct_rev(gss_cat$marital)                    # reverse current order
+fct_relevel(gss_cat$marital, "Never married", after = 0)   # move a level to the front
 ```
 
 Reshaping the levels themselves:
 
 ```r
-fct_lump_n(f, n = 5)              # keep the 5 most common, lump the rest into "Other"
-fct_lump_prop(f, prop = 0.05)     # lump anything below 5% of the data
-fct_recode(f, new = "old")        # rename levels
-fct_collapse(f, north = c("ME", "VT", "NH"))  # merge several levels into one
-fct_expand(f, "unused")           # add a level with no data
-fct_drop(f)                       # remove levels with no data
+fct_lump_n(gss_cat$relig, n = 5)          # keep the 5 most common, lump rest into "Other"
+fct_lump_prop(gss_cat$relig, prop = 0.05) # lump anything below 5% of the data
+fct_recode(gss_cat$marital, single = "Never married")      # rename levels
+fct_collapse(gss_cat$marital,
+             partnered = c("Married", "Separated"))        # merge levels into one
+fct_expand(gss_cat$marital, "Unlisted")   # add a level with no data
+fct_drop(fct_expand(gss_cat$marital, "Unlisted"))          # remove levels with no data
 ```
 
 Missing values:
 
 ```r
-fct_na_value_to_level(f, level = "(Missing)")  # make NA an explicit level
-fct_na_level_to_value(f, extra_levels = "unknown")  # turn a level back into NA
+f <- factor(c("a", "b", NA))
+fct_na_value_to_level(f, level = "(Missing)")        # make NA an explicit level
+fct_na_level_to_value(factor(c("a", "unknown")),
+                      extra_levels = "unknown")      # turn a level back into NA
 ```
 
 `fct_explicit_na()` is deprecated — use `fct_na_value_to_level()`.
@@ -62,7 +70,7 @@ plausible-looking mean of level indices.
 with, even when no rows use them any more:
 
 ```r
-d <- tibble(f = factor(c("a", "b", "c")), v = 1:3) %>% filter(f != "c")
+d <- tibble::tibble(f = factor(c("a", "b", "c")), v = 1:3) %>% filter(f != "c")
 levels(d$f)                    # "a" "b" "c" — "c" survives
 ```
 
@@ -102,8 +110,10 @@ leave a plausible-looking result that is quietly missing half its rows.
 ### Extracting components
 
 ```r
+d <- ymd("2024-03-15")
+
 year(d); month(d); day(d)
-month(d, label = TRUE, abbr = FALSE)   # "January" rather than 1
+month(d, label = TRUE, abbr = FALSE)   # "March" rather than 3
 wday(d, label = TRUE, week_start = 1)  # weekday, weeks starting Monday
 yday(d); isoweek(d); quarter(d)
 ```
@@ -113,7 +123,7 @@ yday(d); isoweek(d); quarter(d)
 Rounding is the standard way to aggregate a time series to a coarser grain:
 
 ```r
-floor_date(d, "month")     # down to the start of the month
+floor_date(d, "month")     # 2024-03-01
 ceiling_date(d, "week")    # up to the end of the week
 round_date(d, "hour")      # to the nearest hour
 ```
@@ -122,7 +132,7 @@ Combine with grouping to build a monthly summary — see
 [grouping.md](grouping.md):
 
 ```r
-df %>%
+tibble::tibble(date = ymd(c("2024-03-01", "2024-03-20")), amount = c(1, 2)) %>%
   mutate(month = floor_date(date, "month")) %>%
   summarise(total = sum(amount), .by = month)
 ```
@@ -142,8 +152,9 @@ daylight-saving boundaries and leap years:
 
 ```r
 d + days(30)
-interval(start, end) / days(1)      # length in days
-time_length(interval(dob, today()), "years")   # age in whole years
+interval(d, d + days(45)) / days(1)                  # length in days
+time_length(interval(ymd("1990-06-01"), d), "years") # age in whole years
+d %within% interval(d - days(1), d + days(1))        # TRUE
 ```
 
 Use `%within%` to test whether an instant falls inside an interval.

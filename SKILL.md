@@ -90,7 +90,7 @@ dialect. Examples in these files use `%>%`; convert them to the user's choice.
 `.by` always returns ungrouped data, so never follow it with `ungroup()`.
 
 ```r
-df %>% summarise(total = sum(x), .by = c(region, year))
+starwars %>% summarise(avg = mean(height, na.rm = TRUE), .by = c(species, gender))
 ```
 
 `group_by()` is the opposite: grouping is attached to the data frame and **every later
@@ -102,14 +102,14 @@ so nothing warns you.
 **Joins** — always `join_by()`; declare cardinality to catch surprises.
 
 ```r
-left_join(orders, customers, by = join_by(customer_id), relationship = "many-to-one")
+left_join(band_members, band_instruments, by = join_by(name), relationship = "many-to-one")
 ```
 
 **Dropping rows** — `filter()` says what to keep, `filter_out()` what to drop.
 `filter_out()` retains `NA` rows, removing the `is.na()` guard negation usually needs.
 
 ```r
-df %>% filter_out(count == 0)     # not: filter(count != 0 | is.na(count))
+starwars %>% filter_out(hair_color == "blond")   # keeps the NA rows too
 ```
 
 **Recoding** — pick by two questions: conditions or values, new vector or update?
@@ -122,10 +122,10 @@ df %>% filter_out(count == 0)     # not: filter(count != 0 | is.na(count))
 **Iteration** — `map()` plus an explicit bind; `map_dfr()` is superseded.
 
 ```r
-map(files, read_csv) %>% list_rbind()
+map(split(mtcars, mtcars$cyl), \(d) head(d, 2)) %>% list_rbind()
 ```
 
-**Column names** — normalize on import: `df %>% rename_with(str_to_snake)`.
+**Column names** — normalize on import: `rename_with(df, str_to_snake)`.
 
 ### Superseded and deprecated
 
@@ -173,25 +173,30 @@ the earliest and cheapest signal that one of these has fired.
 ```r
 library(tidyverse)
 
-result <- raw_data %>%
+size_labels <- tibble(
+  species = c("Human", "Droid"),
+  label   = c("organic", "mechanical")
+)
+
+result <- starwars %>%
   # parse and clean
   mutate(
-    date     = ymd(date_string),
-    amount   = parse_number(amount_str),
-    category = str_to_lower(str_trim(category))
+    species = str_to_lower(str_trim(species)),
+    bmi     = mass / (height / 100)^2
   ) %>%
   # drop rows we don't want, NA-safely
-  filter_out(is.na(amount)) %>%
-  filter(date >= ymd("2023-01-01")) %>%
+  filter_out(is.na(bmi)) %>%
+  filter(height > 100) %>%
   # enrich
-  left_join(lookup_table, by = join_by(category), unmatched = "error") %>%
+  left_join(mutate(size_labels, species = str_to_lower(species)),
+            by = join_by(species)) %>%
   # aggregate
   summarise(
-    total = sum(amount),
-    n     = n(),
-    .by   = c(category, label)
+    avg_bmi = mean(bmi),
+    n       = n(),
+    .by     = c(species, label)
   ) %>%
-  arrange(desc(total))
+  arrange(desc(n))
 ```
 
 ## Style

@@ -14,14 +14,17 @@ Both treat `NA` like `FALSE`. Because they keep opposite sides of that test,
 them. That is what removes the `is.na()` guard a negated condition normally needs:
 
 ```r
-df %>% filter(count != 0 | is.na(count))   # negated condition + explicit NA guard
-df %>% filter_out(count == 0)              # same result, states the intent directly
+library(dplyr)
+
+# 5 starwars characters have NA hair_color
+starwars %>% filter(hair_color != "blond" | is.na(hair_color))  # negation + NA guard
+starwars %>% filter_out(hair_color == "blond")                  # same 84 rows, clearer
 ```
 
 Both take `.by` for per-operation grouping:
 
 ```r
-df %>% filter_out(n() < 3, .by = region)   # drop small groups
+starwars %>% filter_out(n() < 3, .by = species)   # drop species with fewer than 3
 ```
 
 Reach for `filter_out()` whenever you catch yourself writing `!=`, `!`, or
@@ -34,11 +37,11 @@ Any predicate returning `NA` counts as `FALSE` in `filter()`, so those rows vani
 no warning. This bites most often with `str_detect()`, which propagates `NA`:
 
 ```r
-s <- c("apple", NA, "banana")
-str_detect(s, "an")                    # TRUE, NA, TRUE
+s <- tibble(x = c("apple", NA, "banana"))
+stringr::str_detect(s$x, "an")            # TRUE, NA, TRUE
 
-tibble(s) %>% filter(str_detect(s, "an"))      # 1 row — the NA row is gone
-tibble(s) %>% filter_out(str_detect(s, "an"))  # 2 rows — the NA row is kept
+s %>% filter(stringr::str_detect(x, "an"))      # 1 row — the NA row is gone
+s %>% filter_out(stringr::str_detect(x, "an"))  # 2 rows — the NA row is kept
 ```
 
 Whenever a filter shrinks the data more than expected, count the `NA`s in the columns
@@ -66,9 +69,9 @@ arguments are otherwise combined with `&`. `when_any()` lets you write OR condit
 at the same indentation level, without wrapping parentheses:
 
 ```r
-countries %>% filter(when_any(
-  name %in% c("US", "CA") & between(score, 200, 300),
-  name %in% c("PR", "RU") & between(score, 100, 200)
+starwars %>% filter(when_any(
+  species == "Droid" & between(height, 90, 200),
+  species == "Human" & between(mass, 70, 90)
 ))
 ```
 
@@ -110,6 +113,8 @@ no default at all — unmatched values keep their original value by definition.
 ## Creating a new vector
 
 ```r
+x <- 1:20
+
 # condition-based
 case_when(
   x %% 35 == 0 ~ "fizz buzz",
@@ -119,14 +124,15 @@ case_when(
 )
 
 # value-based
-score %>% recode_values(1 ~ "low", 2 ~ "mid", 3 ~ "high")
+c(1, 2, 3) %>% recode_values(1 ~ "low", 2 ~ "mid", 3 ~ "high")
 ```
 
 Group several inputs to one output by passing a vector on the left:
 
 ```r
+x <- c("UNC", "Duke", "NCSU")
 # note: `default`, not `.default` — see the argument-prefix warning above
-name %>% recode_values(c("UNC", "Chapel Hill") ~ "UNC Chapel Hill", default = name)
+x %>% recode_values(c("UNC", "Chapel Hill") ~ "UNC Chapel Hill", default = x)
 ```
 
 ## Updating an existing vector
@@ -136,11 +142,13 @@ state intent more clearly than a `case_when()` with a catch-all default:
 
 ```r
 # condition-based update
-pets %>% mutate(type = replace_when(type, type == "dog" & age <= 2 ~ "puppy"))
+starwars %>%
+  mutate(sex = replace_when(sex, is.na(sex) ~ "unknown")) %>%
+  count(sex)
 
 # value-based update — everything not named passes through untouched
-name %>% replace_values(
-  c("UNC", "Chapel Hill")   ~ "UNC Chapel Hill",
+c("UNC", "Duke University", "NCSU") %>% replace_values(
+  c("UNC", "Chapel Hill")      ~ "UNC Chapel Hill",
   c("Duke", "Duke University") ~ "Duke"
 )
 ```
@@ -155,15 +163,20 @@ recode directly — no hand-written formulas, and the mapping stays data rather 
 code:
 
 ```r
-recode_values(state, from = lookup$abbr, to = lookup$name)
-replace_values(state, from = lookup$abbr, to = lookup$name)
+lookup <- tibble(abbr = c("NC", "SC"), full = c("North Carolina", "South Carolina"))
+state  <- c("NC", "SC", "NC")
+
+recode_values(state,  from = lookup$abbr, to = lookup$full)
+replace_values(state, from = lookup$abbr, to = lookup$full)
 ```
 
 This is the main reason these functions replace both `case_match()` and `recode()`.
 It also composes with `across()` for multi-column recoding:
 
 ```r
-df %>% mutate(across(starts_with("q"), \(x) recode_values(x, from = key$code, to = key$label)))
+key <- tibble(code = c(1, 2), label = c("yes", "no"))
+tibble(q1 = c(1, 2), q2 = c(2, 1)) %>%
+  mutate(across(starts_with("q"), \(x) recode_values(x, from = key$code, to = key$label)))
 ```
 
 ## Failing loudly on unmatched values
@@ -173,8 +186,8 @@ default. A default silently buckets values you did not anticipate; an error surf
 them while you can still fix the mapping:
 
 ```r
-# errors if score contains anything other than 1 or 2
-recode_values(score, 1 ~ "low", 2 ~ "mid", unmatched = "error")
+# errors because 3 is unmapped
+recode_values(c(1, 2, 3), 1 ~ "low", 2 ~ "mid", unmatched = "error")
 ```
 
 `case_when()` has the same argument as `.unmatched = "error"`. Use it in pipelines
@@ -201,7 +214,8 @@ inside data.table code.
 match. Branches that are invalid outside their own condition still run:
 
 ```r
-case_when(x > 0 ~ sqrt(x), .default = 0)   # warns "NaNs produced" if x has negatives
+x <- c(4, -1)
+case_when(x > 0 ~ sqrt(x), .default = 0)   # warns "NaNs produced" — sqrt(-1) still runs
 ```
 
 The result is correct — unmatched rows take the default — but the warning is real and

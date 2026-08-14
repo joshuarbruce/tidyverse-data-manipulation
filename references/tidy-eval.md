@@ -23,11 +23,13 @@ environment. If a column happens to share a name with a local variable, the colu
 silently wins:
 
 ```r
-threshold <- 100
-df <- tibble(x = c(1, 200), threshold = c(0, 0))
+library(dplyr)
 
-df %>% filter(x > threshold)         # compares against the COLUMN (0) — keeps 2 rows
-df %>% filter(x > .env$threshold)    # compares against 100 — keeps 1 row
+threshold <- 100
+d <- tibble::tibble(x = c(1, 200), threshold = c(0, 0))
+
+d %>% filter(x > threshold)         # compares against the COLUMN (0) — keeps 2 rows
+d %>% filter(x > .env$threshold)    # compares against 100 — keeps 1 row
 ```
 
 Nothing errors, because both readings are valid code. The result is simply computed
@@ -53,7 +55,7 @@ group_mean <- function(df, col, group) {
     summarise(mean = mean({{ col }}, na.rm = TRUE), .by = {{ group }})
 }
 
-group_mean(sales, revenue, region)
+group_mean(starwars, height, species)
 ```
 
 `{{ col }}` is shorthand for `!!enquo(col)` — you rarely need the long form.
@@ -67,7 +69,7 @@ filter_above <- function(df, col_name, threshold) {
   df %>% filter(.data[[col_name]] > threshold)
 }
 
-filter_above(df, "price", 100)
+filter_above(starwars, "height", 200)
 ```
 
 ## Tidy selection in functions: `all_of()` / `any_of()`
@@ -79,7 +81,7 @@ drop_cols <- function(df, cols) {
   df %>% select(-all_of(cols))
 }
 
-drop_cols(df, c("id", "temp"))
+drop_cols(starwars, c("films", "vehicles", "starships"))
 ```
 
 - `all_of()` — errors if any name is missing (safe default).
@@ -94,7 +96,7 @@ group_summary <- function(df, ...) {
   df %>% summarise(n = n(), .by = c(...))
 }
 
-group_summary(df, region, year)
+group_summary(starwars, species, gender)
 ```
 
 ## Injecting computed names with `:=`
@@ -104,9 +106,11 @@ interpolation via `"{name}"`:
 
 ```r
 add_zscore <- function(df, col) {
-  col_name <- paste0(rlang::as_label(enquo(col)), "_z")
-  df %>% mutate("{col_name}" := scale({{ col }})[,1])
+  col_name <- paste0(rlang::as_label(rlang::enquo(col)), "_z")
+  df %>% mutate("{col_name}" := as.numeric(scale({{ col }})))
 }
+
+add_zscore(mtcars, mpg)
 ```
 
 ## Common patterns cheat sheet

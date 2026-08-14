@@ -9,15 +9,20 @@ observation, values spread across columns, or several values packed into one col
 `pivot_longer()` and `pivot_wider()` cover almost all reshaping needs:
 
 ```r
-# wide → long
-df %>% pivot_longer(
-  cols      = starts_with("week_"),
+library(tidyr)
+
+# wide -> long: billboard has wk1..wk76 chart positions
+billboard %>% pivot_longer(
+  cols      = starts_with("wk"),
   names_to  = "week",
-  values_to = "sales"
+  values_to = "rank",
+  values_drop_na = TRUE
 )
 
-# long → wide
-df %>% pivot_wider(names_from = category, values_from = amount)
+# long -> wide
+relig_income %>%
+  pivot_longer(-religion, names_to = "income", values_to = "n") %>%
+  pivot_wider(names_from = income, values_from = n)
 ```
 
 Useful arguments:
@@ -33,7 +38,7 @@ If `pivot_wider()` warns about duplicate identifiers, the fix is almost always t
 find them first rather than to silence the warning:
 
 ```r
-df %>% count(id, category) %>% filter(n > 1)
+fish_encounters %>% dplyr::count(fish, station) %>% dplyr::filter(n > 1)
 ```
 
 ## Splitting and combining columns
@@ -42,8 +47,11 @@ df %>% count(id, category) %>% filter(n > 1)
 `separate()`:
 
 ```r
-df %>% separate_wider_delim(full_name, delim = " ", names = c("first", "last"))
-df %>% separate_wider_regex(code, patterns = c(region = "[A-Z]{2}", "-", id = "\\d+"))
+people <- tibble::tibble(full_name = c("Ada Lovelace", "Alan Turing"))
+people %>% separate_wider_delim(full_name, delim = " ", names = c("first", "last"))
+
+codes <- tibble::tibble(code = c("NC-12", "SC-34"))
+codes %>% separate_wider_regex(code, patterns = c(state = "[A-Z]{2}", "-", id = "\\d+"))
 ```
 
 Use `too_few` and `too_many` to control what happens on ragged input — the default is
@@ -55,9 +63,9 @@ to error, which is usually what you want. `unite()` is the inverse.
 fit many models or apply a function per group:
 
 ```r
-df %>%
-  nest(.by = group) %>%
-  mutate(model = map(data, \(d) lm(y ~ x, data = d)))
+mtcars %>%
+  nest(.by = cyl) %>%
+  dplyr::mutate(model = purrr::map(data, \(d) lm(mpg ~ hp, data = d)))
 ```
 
 `unnest()` reverses it. `unnest_longer()` expands a list-column down the rows;
@@ -66,10 +74,10 @@ df %>%
 ## Missing values
 
 ```r
-df %>% drop_na()                  # drop rows with any NA
-df %>% drop_na(amount)            # drop rows missing a specific column
-df %>% complete(group, date)      # make implicit missing combinations explicit
-df %>% replace_na(list(n = 0))    # substitute a value
+dplyr::starwars %>% drop_na()             # drop rows with any NA
+dplyr::starwars %>% drop_na(height)       # drop rows missing a specific column
+fish_encounters %>% complete(fish, station)  # make implicit missings explicit
+tibble::tibble(n = c(1, NA)) %>% replace_na(list(n = 0))   # substitute a value
 ```
 
 `complete()` is the tool when a group is missing entirely from the data and its absence
@@ -80,7 +88,8 @@ series.
 grouping no longer needs `group_by()`:
 
 ```r
-df %>% fill(value, .direction = "down", .by = station)
+tibble::tibble(g = c("a", "a", "b"), v = c(1, NA, 3)) %>%
+  fill(v, .direction = "down", .by = g)
 ```
 
 To replace values *within* an existing column rather than fill gaps, see

@@ -1,15 +1,25 @@
 # Joins Reference
 
+Examples use dplyr's `band_members` and `band_instruments`, which are built for this:
+`Mick` appears only in members, `Keith` only in instruments, so every unmatched-row
+behavior is visible.
+
+```r
+library(dplyr)
+
+band_members       # name, band   — Mick, John, Paul
+band_instruments   # name, plays  — John, Paul, Keith
+```
+
 Use `join_by()` for the `by` argument — it is clearer than a character vector and it
 is the only form that supports inequality and rolling joins:
 
 ```r
-left_join(orders, customers, by = join_by(customer_id))
-left_join(events, windows, by = join_by(time >= start, time < end))  # inequality
+left_join(band_members, band_instruments, by = join_by(name))
 ```
 
-The older `by = c("cust_id" = "id")` character form still works but is superseded;
-`join_by(cust_id == id)` reads better and is checked at the call site.
+The older `by = c("name" = "name")` character form still works but is superseded;
+`join_by()` reads better and is checked at the call site.
 
 ## Join types
 
@@ -25,35 +35,41 @@ The older `by = c("cust_id" = "id")` character form still works but is supersede
 ## join_by() syntax
 
 ```r
-# Simple equality
-left_join(orders, customers, by = join_by(customer_id))
+# simple equality
+left_join(band_members, band_instruments, by = join_by(name))
 
-# Different column names
-left_join(orders, customers, by = join_by(cust_id == id))
+# different column names on each side
+left_join(band_members, rename(band_instruments, who = name), by = join_by(name == who))
+```
 
-# Inequality (non-equi) join
+Inequality and rolling joins take comparison operators rather than `==`:
+
+```r
+events  <- tibble(id = 1:2, time = c(3, 12))
+windows <- tibble(window = c("early", "late"), start = c(0, 10), end = c(10, 20))
+
+# non-equi: match each event to the window containing it
 left_join(events, windows, by = join_by(time >= start, time < end))
 
-# Rolling join — nearest match
-left_join(readings, calibrations, by = join_by(closest(time >= cal_time)))
+# rolling: match to the nearest earlier reading
+readings <- tibble(t = c(1, 5, 9), value = c(10, 20, 30))
+probes   <- tibble(t = c(4, 8))
+left_join(probes, readings, by = join_by(closest(t >= t)))
 ```
 
 ## Cardinality checking
 
-Declare the expected relationship to catch surprises early:
+Declare the expected relationship so a surprise errors instead of silently changing
+the row count:
 
 ```r
-inner_join(a, b, by = join_by(id),
-           relationship = "many-to-one")   # many a rows per b row
+left_join(band_members, band_instruments,
+          by = join_by(name), relationship = "many-to-one")
 
 # Options: "one-to-one", "one-to-many", "many-to-one", "many-to-many"
 ```
 
 ## Handling unmatched rows
-
-```r
-left_join(a, b, by = join_by(id), unmatched = "error")
-```
 
 **`unmatched` guards the side whose rows would be dropped — not the side that gets
 `NA`s.** This is the opposite of what most people assume, and it is the difference
@@ -61,22 +77,26 @@ between catching a broken lookup table and missing it entirely.
 
 In a `left_join()`, every row of `x` is kept no matter what, so `unmatched = "error"`
 says nothing about them; it errors only when a row of `y` finds no match and is
-therefore discarded ("Each row of `y` must be matched by `x`"):
+therefore discarded:
 
 ```r
-x <- tibble(id = c(1, 2))   # id 2 has no match in y
-y <- tibble(id = c(1, 3))   # id 3 has no match in x
+# Mick has no instrument (gets NA); Keith is in no band (gets dropped)
+left_join(band_members, band_instruments, by = join_by(name))
+#> Mick  Stones  NA
+#> John  Beatles guitar
+#> Paul  Beatles bass
 
-left_join(x, y, by = join_by(id), unmatched = "error")
-#> Error: Each row of `y` must be matched by `x`   <- about id 3, not id 2
+left_join(band_members, band_instruments, by = join_by(name), unmatched = "error")
+#> Error: Each row of `y` must be matched by `x`   <- about Keith, not Mick
 ```
 
 So the common worry — "did my lookup table cover every row of my main table?" — is
-**not** what `unmatched = "error"` checks in a left join. Row `id = 2` still silently
-becomes `NA`. Use `anti_join()` for that:
+**not** what `unmatched = "error"` checks in a left join. Mick still silently becomes
+`NA`. Use `anti_join()` for that:
 
 ```r
-anti_join(x, y, by = join_by(id))   # rows of x with no match — the real check
+anti_join(band_members, band_instruments, by = join_by(name))
+#> Mick  Stones     <- the real check for rows that found no match
 ```
 
 `inner_join()` drops from both sides, so `unmatched = "error"` there checks both.
@@ -90,8 +110,11 @@ dropped, `anti_join()` for rows being `NA`-filled, `relationship` for row counts
 in the key — as if `NA` were an ordinary value:
 
 ```r
-left_join(a, b, by = join_by(k))                      # NA row matches the NA row
-left_join(a, b, by = join_by(k), na_matches = "never") # NA row gets NA columns
+x <- tibble(k = c("a", NA), vx = 1:2)
+y <- tibble(k = c("a", NA), vy = c("A", "MISSING"))
+
+left_join(x, y, by = join_by(k))                       # NA row matches -> "MISSING"
+left_join(x, y, by = join_by(k), na_matches = "never") # NA row gets NA
 ```
 
 **This is the opposite of SQL**, where `NULL` never equals `NULL` and such rows never
@@ -105,7 +128,11 @@ about an unexpected many-to-many relationship, but a warning is easy to lose in 
 script. Declare the expectation so it errors instead:
 
 ```r
-left_join(a, b, by = join_by(k), relationship = "many-to-one")
+dup_x <- tibble(k = c("a", "a"), vx = 1:2)
+dup_y <- tibble(k = c("a", "a"), vy = c("A", "B"))
+
+nrow(left_join(dup_x, dup_y, by = join_by(k)))   # 4, from 2 x 2
+left_join(dup_x, dup_y, by = join_by(k), relationship = "many-to-one")   # errors
 ```
 
 Check row counts before and after any join. A join that changes `nrow()` when you did
@@ -116,15 +143,20 @@ not expect it to is the single most common source of wrong analysis results.
 - **Factor vs character** — join keys must be the same type. Use `as.character()`
   or `as_factor()` to align.
 - **Column name conflicts** — if both tables have a non-key column with the same
-  name, dplyr adds `.x` and `.y` suffixes. Use `suffix = c("_orders", "_items")`
+  name, dplyr adds `.x` and `.y` suffixes. Use `suffix = c("_left", "_right")`
   to make them meaningful, or rename before joining.
 
-## Checking for unmatched rows after a join
+## Checking a join
+
+Two cheap checks catch most join bugs:
 
 ```r
-# Rows in orders with no matching customer
-anti_join(orders, customers, by = join_by(customer_id))
+# 1. which rows found no match?
+anti_join(band_members, band_instruments, by = join_by(name))
 
-# See which keys are duplicated
-orders %>% count(customer_id) %>% filter(n > 1)
+# 2. which keys are duplicated? (duplicates are what multiply rows)
+band_instruments %>% count(name) %>% filter(n > 1)
 ```
+
+Run the first before trusting any enrichment join, and the second before joining
+anything you did not create yourself.

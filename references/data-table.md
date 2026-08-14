@@ -26,14 +26,16 @@ DT[ i ,        j ,        by ]
 
 ```r
 library(data.table)
-dt <- as.data.table(df)        # or fread() to read straight into a data.table
+
+# examples use mtcars, with the row names kept as a column
+dt <- as.data.table(mtcars, keep.rownames = "car")
 ```
 
 ## Filtering rows (i)
 
 ```r
-dt[origin == "JFK" & month == 6L]      # no dt$ prefix needed
-dt[order(-arr_delay)]                  # sort (radix sort, very fast)
+dt[cyl == 6 & hp > 110]      # no dt$ prefix needed
+dt[order(-mpg)]              # sort (radix sort, very fast)
 ```
 
 ## Selecting / computing columns (j)
@@ -41,9 +43,9 @@ dt[order(-arr_delay)]                  # sort (radix sort, very fast)
 `.()` is data.table's alias for `list()`:
 
 ```r
-dt[, .(arr_delay, dep_delay)]                       # select columns
-dt[, .(avg = mean(arr_delay))]                       # compute a summary
-dt[origin == "JFK", mean(arr_delay)]                 # filter + compute together
+dt[, .(mpg, hp)]                # select columns
+dt[, .(avg = mean(mpg))]        # compute a summary
+dt[cyl == 6, mean(mpg)]         # filter + compute together
 ```
 
 ## Adding / modifying columns by reference: `:=`
@@ -53,12 +55,12 @@ copy. Fast and memory-light, but it mutates the original object, so use
 deliberately:
 
 ```r
-dt[, speed := distance / air_time]            # add one column
-dt[, c("a", "b") := .(x * 2, y * 3)]          # add several
-dt[origin == "JFK", flag := TRUE]             # conditional update on a subset
-dt[, col := NULL]                              # delete a column
-dt[, grp_mean := mean(arr_delay), by = origin] # grouped update — writes the
-                                               # group mean back to every row
+dt[, power_ratio := hp / wt]                  # add one column
+dt[, c("hp2", "wt2") := .(hp * 2, wt * 2)]    # add several
+dt[cyl == 6, six_cyl := TRUE]                 # conditional update on a subset
+dt[, hp2 := NULL]                             # delete a column
+dt[, grp_mean := mean(mpg), by = cyl]         # grouped update — writes the
+                                              # group mean back to every row
 ```
 
 The grouped form (`:= ... by =`) is a defining data.table idiom: it computes per
@@ -72,10 +74,10 @@ a loop over many columns, `set(dt, i, j, value)` is the lowest-overhead option
 ## Grouping (by)
 
 ```r
-dt[, .N, by = origin]                          # .N = row count per group
-dt[, .(avg = mean(arr_delay)), by = origin]    # grouped summary
-dt[, .(avg = mean(arr_delay)), keyby = origin] # same, but sorted by group
-dt[, .(avg = mean(arr_delay)), by = .(origin, month)]   # multiple groups
+dt[, .N, by = cyl]                       # .N = row count per group
+dt[, .(avg = mean(mpg)), by = cyl]       # grouped summary
+dt[, .(avg = mean(mpg)), keyby = cyl]    # same, but sorted by group
+dt[, .(avg = mean(mpg)), by = .(cyl, gear)]   # multiple groups
 ```
 
 ### Operating on many columns: `.SD` and `.SDcols`
@@ -84,9 +86,9 @@ dt[, .(avg = mean(arr_delay)), by = .(origin, month)]   # multiple groups
 function across columns:
 
 ```r
-dt[, lapply(.SD, mean), by = origin, .SDcols = c("arr_delay", "dep_delay")]
-dt[, head(.SD, 2), by = origin]                 # first 2 rows of each group
-dt[, .SD[which.max(arr_delay)], by = origin]    # the worst-delay row per group
+dt[, lapply(.SD, mean), by = cyl, .SDcols = c("mpg", "hp")]
+dt[, head(.SD, 2), by = cyl]              # first 2 rows of each group
+dt[, .SD[which.max(mpg)], by = cyl]       # the best-mpg row per group
 ```
 
 `.SD` **excludes the `by` columns**, so `lapply(.SD, mean)` will not try to average
@@ -115,7 +117,7 @@ Append brackets to pipe one result into the next query — data.table's equivale
 the `%>%` chain:
 
 ```r
-dt[origin == "JFK", .(avg = mean(arr_delay)), by = month][order(-avg)]
+dt[hp > 100, .(avg = mean(mpg)), by = cyl][order(-avg)]
 ```
 
 ## Keys and fast subsetting
@@ -126,17 +128,17 @@ reference, in place). Subsetting on a keyed column then uses **binary search**
 on 20M rows. Keys are the main reason data.table is fast for repeated lookups.
 
 ```r
-setkey(dt, origin)                 # key by one column (unquoted)
-setkeyv(dt, c("origin", "dest"))   # key by a character vector (for programming)
+setkey(dt, cyl)                    # key by one column (unquoted)
+setkeyv(dt, c("cyl", "gear"))      # key by a character vector (for programming)
 key(dt)                            # inspect the current key
 
-dt[.("JFK")]                       # keyed subset — binary search
-dt[.("JFK", "MIA")]                # matches origin then dest
-dt[.("JFK"), max(arr_delay)]       # combine with j
+dt[.(6)]                           # keyed subset — binary search
+dt[.(6, 4)]                        # matches cyl then gear
+dt[.(6), max(mpg)]                 # combine with j
 ```
 
 A table has at most one key (it can only be sorted one way). `keyby = ` in a grouped
-query both groups and leaves the result keyed/sorted. `setorder(dt, -arr_delay)`
+query both groups and leaves the result keyed/sorted. `setorder(dt, -mpg)`
 sorts in place without setting a key.
 
 ## Secondary indices and `on=`
@@ -146,9 +148,9 @@ the table. The `on=` argument creates one on the fly (auto-indexing) — this is
 the joins above use `on=`:
 
 ```r
-setindex(dt, origin)               # build a reusable secondary index
-dt[origin == "JFK"]                # auto-indexed after first use
-dt["JFK", on = "origin"]           # explicit index subset, no key needed
+setindex(dt, gear)                 # build a reusable secondary index
+dt[gear == 4]                      # auto-indexed after first use
+dt[.(4), on = "gear"]              # explicit index subset, no key needed
 ```
 
 Use `on=` for ad-hoc fast subsets/joins; promote to a `setkey()` when you query the
@@ -158,11 +160,11 @@ same column repeatedly and don't mind the table being reordered.
 
 ```r
 # wide -> long  (tidyr::pivot_longer equivalent)
-melt(dt, id.vars = "id", measure.vars = c("jan", "feb"),
-     variable.name = "month", value.name = "sales")
+long <- melt(dt, id.vars = "car", measure.vars = c("mpg", "hp"),
+             variable.name = "metric", value.name = "value")
 
 # long -> wide  (tidyr::pivot_wider equivalent)
-dcast(dt, id ~ month, value.var = "sales")
+dcast(long, car ~ metric, value.var = "value")
 ```
 
 ## Joins
@@ -171,15 +173,17 @@ data.table joins via the bracket (`X[Y]`) or `merge()`. `merge()` reads more lik
 dplyr and is usually clearer:
 
 ```r
-merge(orders, customers, by = "customer_id", all.x = TRUE)   # left join
+makers <- data.table(cyl = c(4, 6, 8), label = c("small", "mid", "big"))
+merge(dt, makers, by = "cyl", all.x = TRUE)   # left join
 ```
 
 It also supports advanced joins the tidyverse does too — non-equi, rolling:
 
 ```r
-setkey(dt, id)                      # set a key for fast repeated joins
-dt[customers, on = "customer_id"]   # join by key
-dt[windows, on = .(time >= start, time < end)]   # non-equi join
+dt[makers, on = "cyl"]              # join by column
+
+bands <- data.table(lo = c(0, 20), hi = c(20, 40), band = c("thirsty", "efficient"))
+dt[bands, on = .(mpg >= lo, mpg < hi)]   # non-equi join
 ```
 
 ## Fast file I/O
@@ -188,8 +192,9 @@ These are worth using even in an otherwise-tidyverse workflow — they are marke
 faster than `read_csv()`/`write_csv()` on large files:
 
 ```r
-dt <- fread("big.csv")          # auto-detects types, very fast
-fwrite(dt, "out.csv")
+path <- tempfile(fileext = ".csv")
+fwrite(dt, path)
+back <- fread(path)             # auto-detects types, very fast
 ```
 
 ## Fast vectorized helpers
@@ -199,16 +204,18 @@ operations. Prefer these inside data.table code — they avoid copies and handle
 predictably:
 
 ```r
+x <- c(-1, 0, 5)
+
 fifelse(x > 0, "pos", "neg")              # vectorized if_else (cf. dplyr::if_else)
 fcase(                                    # vectorized case_when
-  x < 0, "neg",
+  x < 0,  "neg",
   x == 0, "zero",
-  x > 0, "pos"
+  x > 0,  "pos"
 )
 shift(x, n = 1, type = "lag")             # lag/lead (type = "lead" for forward)
 uniqueN(x)                                # count distinct (cf. n_distinct)
-nafill(x, type = "locf")                  # fill NAs: "locf", "nocb", or fill = 0
-rowid(group)                              # within-group row counter
+nafill(c(1, NA, 3), type = "locf")        # fill NAs: "locf", "nocb", or fill = 0
+rowid(c("a", "a", "b"))                   # within-group row counter
 frank(x, ties.method = "min")             # fast rank
 ```
 
@@ -245,9 +252,9 @@ bracket syntax at all:
 library(dtplyr)
 library(dplyr)
 
-result <- lazy_dt(df) %>%               # wrap in a lazy data.table
-  filter(year >= 2020) %>%
-  summarise(total = sum(sales), .by = region) %>%
+result <- lazy_dt(mtcars) %>%           # wrap in a lazy data.table
+  filter(mpg > 20) %>%
+  summarise(mean_hp = mean(hp), .by = cyl) %>%
   collect()                              # materialise back to a tibble
 ```
 
@@ -268,18 +275,18 @@ This is the trap that costs the most debugging time. `dt2 <- dt` creates a secon
 name for the *same* table, not a copy:
 
 ```r
-dt  <- data.table(x = 1:3)
-dt2 <- dt
-dt2[, y := 99]
+d1 <- data.table(x = 1:3)
+d2 <- d1
+d2[, y := 99]
 
-names(dt)     # "x" "y"  <- the ORIGINAL changed too
+names(d1)     # "x" "y"  <- the ORIGINAL changed too
 ```
 
 `copy()` is the only way to get an independent table:
 
 ```r
-dt3 <- copy(dt)
-dt3[, z := 1]   # dt is untouched
+d3 <- copy(d1)
+d3[, z := 1]   # d1 is untouched
 ```
 
 Nothing warns, and the code reads exactly like the tidyverse equivalent that would be
@@ -297,9 +304,9 @@ add_flag <- function(d) {
   invisible(NULL)
 }
 
-dt <- data.table(x = 1:2)
-add_flag(dt)
-names(dt)   # "x" "flag"  <- modified from inside the function
+d4 <- data.table(x = 1:2)
+add_flag(d4)
+names(d4)   # "x" "flag"  <- modified from inside the function
 ```
 
 That is often the *point* — it avoids copying a large table — but it must be
@@ -315,9 +322,9 @@ caller's `data.frame` into a data.table without copying, which is efficient but 
 Setting a key physically sorts the table — the original row order is gone, silently:
 
 ```r
-dt <- data.table(id = c(3L, 1L, 2L))
-setkey(dt, id)
-dt$id   # 1 2 3
+d5 <- data.table(id = c(3L, 1L, 2L))
+setkey(d5, id)
+d5$id   # 1 2 3
 ```
 
 If anything downstream depends on the incoming order — a row number recorded earlier,
@@ -332,8 +339,9 @@ Melting columns of different types does not fail — data.table warns and coerce
 everything to the highest type in its hierarchy, usually `character`:
 
 ```r
-melt(dt, id.vars = "id", measure.vars = c("num", "chr"))
-# warning: 'measure.vars' are not all of the same type ... will be of type 'character'
+mixed <- data.table(id = 1, num = 1.5, chr = "a")
+melt(mixed, id.vars = "id", measure.vars = c("num", "chr"))
+# warning: not all of the same type ... will be of type 'character'
 ```
 
 tidyr's `pivot_longer()` errors on the same input. If you are translating a pipeline
@@ -356,11 +364,14 @@ data.table's versions are plain numeric extractors with no `label`, `abbr`, or
 second:
 
 ```r
+d <- as.Date("2024-03-15")
+
 library(lubridate)
-month(d, label = TRUE)   # "Mar"
+month(d, label = TRUE)              # "Mar"
 
 library(data.table)
-month(d, label = TRUE)   # Error: unused argument (label = TRUE)
+month(d, label = TRUE)              # Error: unused argument (label = TRUE)
+lubridate::month(d, label = TRUE)   # "Mar" — qualify to be safe
 ```
 
 It fails loudly, which is the good case — but the failure appears far from the

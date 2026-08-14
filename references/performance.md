@@ -6,13 +6,13 @@ Never guess at bottlenecks. Measure first:
 
 ```r
 library(profvis)
-profvis({ your_code_here })  # line-by-line flame graph in RStudio viewer
+profvis({ mtcars[rep(1:32, 1000), ] |> subset(mpg > 20) })  # flame graph
 
 library(bench)
 bench::mark(
-  dplyr  = df %>% filter(x > 0),
-  base   = df[df$x > 0, ],
-  check  = FALSE  # skip output equality check
+  dplyr = dplyr::filter(mtcars, mpg > 20),
+  base  = mtcars[mtcars$mpg > 20, ],
+  check = FALSE  # skip output equality check
 )
 ```
 
@@ -23,12 +23,13 @@ faster via lazy loading:
 
 ```r
 library(vroom)
-df <- vroom("large.csv", col_types = cols(id = col_character()))
+chickens <- vroom(readr::readr_example("chickens.csv"), show_col_types = FALSE)
 ```
 
 `vroom` also reads multiple files efficiently:
 ```r
-df <- vroom(list.files("data/", "\\.csv$", full.names = TRUE))
+vroom(c(readr::readr_example("mini-gapminder-africa.csv"),
+        readr::readr_example("mini-gapminder-americas.csv")), show_col_types = FALSE)
 ```
 
 ## dtplyr — dplyr syntax over data.table
@@ -38,12 +39,11 @@ that gets translated to `data.table` operations automatically:
 
 ```r
 library(dtplyr)
-library(data.table)
+library(dplyr)
 
-dt <- lazy_dt(df)              # wrap in a lazy data.table
-result <- dt %>%
-  filter(year >= 2020) %>%
-  summarise(total = sum(sales), .by = region) %>%
+lazy_dt(mtcars) %>%            # wrap in a lazy data.table
+  filter(mpg > 20) %>%
+  summarise(mean_hp = mean(hp), .by = cyl) %>%
   collect()                    # materialise the result
 ```
 
@@ -82,7 +82,7 @@ overhead costs more than it saves.
 
 ```r
 mirai::daemons(4)
-results <- map(file_list, in_parallel(\(f) process(f), process = process))
+results <- purrr::map(1:4, purrr::in_parallel(\(i) i^2))
 ```
 
 **furrr** mirrors purrr's API with a `future_` prefix and is the mature option:
@@ -91,7 +91,7 @@ results <- map(file_list, in_parallel(\(f) process(f), process = process))
 library(furrr)
 plan(multisession, workers = 4)  # use 4 cores
 
-results <- future_map(file_list, read_and_process)
+results <- future_map(split(mtcars, mtcars$cyl), nrow)
 ```
 
 Prefer `in_parallel()` for new code in a purrr-centric pipeline; prefer furrr when you

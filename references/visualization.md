@@ -6,11 +6,18 @@ example code fail or warn.
 ## Build plots layer by layer
 
 ```r
-ggplot(df, aes(x = year, y = revenue, color = region)) +
+library(ggplot2)
+library(dplyr)
+
+by_year <- economics %>%
+  mutate(year = lubridate::year(date)) %>%
+  summarise(unemploy = mean(unemploy), .by = year)
+
+ggplot(by_year, aes(x = year, y = unemploy)) +
   geom_line(linewidth = 0.8) +
   geom_point(size = 2) +
   scale_y_continuous(labels = scales::comma) +
-  labs(title = "Revenue by region", x = NULL, y = "Revenue ($)") +
+  labs(title = "Mean unemployment by year", x = NULL, y = "Unemployed (thousands)") +
   theme_minimal()
 ```
 
@@ -33,10 +40,12 @@ ggplot2 3.4 and old code using `size` for lines now warns.
 the wrong one produces a valid-looking chart with wrong heights and no warning:
 
 ```r
-df <- tibble(cat = c("a", "b"), n = c(5, 10))
+counts <- tibble::tibble(cat = c("a", "b"), n = c(5, 10))
 
-ggplot(df, aes(cat)) + geom_bar()        # every bar height 1 — it counted the rows
-ggplot(df, aes(cat, n)) + geom_col()     # heights 5 and 10 — what you wanted
+ggplot(counts, aes(cat)) + geom_bar()        # every bar height 1 — it counted the rows
+ggplot(counts, aes(cat, n)) + geom_col()     # heights 5 and 10 — what you wanted
+
+ggplot(mpg, aes(class)) + geom_bar()         # correct use: let ggplot do the counting
 ```
 
 Use `geom_col()` when the data is already aggregated, `geom_bar()` when you want
@@ -50,19 +59,21 @@ series in its own column. Most "how do I plot these five columns" questions are
 reshaping questions — see [reshaping.md](reshaping.md):
 
 ```r
-df_long <- df_wide %>%
-  pivot_longer(cols = Jan:Dec, names_to = "month", values_to = "sales") %>%
-  mutate(month = factor(month, levels = month.abb))
+long <- tidyr::billboard %>%
+  tidyr::pivot_longer(starts_with("wk"), names_to = "week",
+                      values_to = "rank", values_drop_na = TRUE) %>%
+  filter(artist %in% c("2Pac", "3 Doors Down"))
 
-ggplot(df_long, aes(x = month, y = sales, group = region, color = region)) +
+ggplot(long, aes(x = week, y = rank, group = track, color = track)) +
   geom_line() +
   theme_minimal()
 ```
 
-Converting `month` to a factor with explicit levels is what stops the x-axis from
-sorting alphabetically. Controlling categorical order is a forcats job — see
-[factors-and-dates.md](factors-and-dates.md), especially
-`fct_reorder()` for ordering bars by value.
+Note that `week` here is character (`"wk1"`, `"wk2"`, …), so the x-axis sorts
+alphabetically — `wk10` lands before `wk2`. Whenever a categorical axis comes out in
+the wrong order, the fix is to control the factor, not the plot: convert with explicit
+`levels`, or use `fct_reorder()` to order by value. See
+[factors-and-dates.md](factors-and-dates.md).
 
 ## Deprecated and superseded forms
 
@@ -84,7 +95,8 @@ notation and `qplot()` are deprecated and warn.
 ## Saving
 
 ```r
-ggsave("plot.png", plot = p, width = 8, height = 5, dpi = 300)
+p <- ggplot(mpg, aes(displ, hwy)) + geom_point()
+ggsave(tempfile(fileext = ".png"), plot = p, width = 8, height = 5, dpi = 300)
 ```
 
 `ggsave()` defaults to the last plot displayed, but naming the plot explicitly is

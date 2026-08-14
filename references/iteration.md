@@ -10,10 +10,13 @@ if the result is the wrong type** — that type checking is the main reason to p
 them over `sapply()`:
 
 ```r
-results <- map(file_list, read_csv)                          # list
-means   <- map_dbl(df_list, \(d) mean(d$value, na.rm = TRUE)) # double vector
-names   <- map_chr(models, \(m) class(m)[1])                  # character vector
-flags   <- map_lgl(x, is.numeric)                             # logical vector
+library(purrr)
+by_cyl <- split(mtcars, mtcars$cyl)   # a list of 3 data frames
+
+results <- map(by_cyl, nrow)                          # list
+means   <- map_dbl(by_cyl, \(d) mean(d$mpg))          # double vector
+labels  <- map_chr(by_cyl, \(d) class(d)[1])          # character vector
+flags   <- map_lgl(mtcars, is.numeric)                # logical vector
 ```
 
 Use `\(x)` for anonymous functions rather than `function(x)` or the older `~ .x`
@@ -25,31 +28,31 @@ for dates and other vctrs-backed types that `map_dbl()` would strip.
 ## Combining results
 
 ```r
-combined <- map(file_list, read_csv) %>% list_rbind()   # stack data frames
-wide     <- map(cols, summarize_col) %>% list_cbind()   # bind side by side
-values   <- map(x, f) %>% list_c()                      # flatten to a vector
+combined <- map(by_cyl, \(d) head(d, 2)) %>% list_rbind()  # stack data frames
+values   <- map(1:3, \(i) i * 2) %>% list_c()              # flatten to a vector
 ```
 
 `list_rbind()` accepts `names_to`, which records which element each row came from —
 useful when reading many files and needing to know the source:
 
 ```r
-files <- list.files("data/", pattern = "\\.csv$", full.names = TRUE)
+files <- c(readr::readr_example("mini-gapminder-africa.csv"),
+           readr::readr_example("mini-gapminder-americas.csv"))
 
 all_data <- files %>%
   set_names(basename) %>%
-  map(read_csv, col_types = cols(.default = col_character())) %>%
+  map(readr::read_csv, show_col_types = FALSE) %>%
   list_rbind(names_to = "source_file")
 ```
 
 ## Multiple inputs, and side effects
 
 ```r
-map2(x, y, \(a, b) a + b)                 # two inputs, in parallel
-pmap(list(x, y, z), \(a, b, c) a + b + c) # any number of inputs
-imap(x, \(val, nm) paste(nm, val))        # value and its name/index
+map2(1:3, 4:6, \(a, b) a + b)                  # two inputs, in parallel
+pmap(list(1:3, 4:6, 7:9), \(a, b, c) a + b + c) # any number of inputs
+imap(c(a = 1, b = 2), \(val, nm) paste(nm, val)) # value and its name/index
 
-walk(paths, \(p) write_csv(df, p))        # side effects; returns input invisibly
+walk(1:3, \(i) cat("step", i, "\n"))            # side effects; returns input invisibly
 ```
 
 `keep()` / `discard()` filter a list by a predicate; `reduce()` collapses it to a
@@ -63,9 +66,11 @@ currently experimental) to run across worker processes without leaving purrr:
 ```r
 mirai::daemons(4)   # without daemons, it silently falls back to sequential
 
+summarise_file <- \(path) nrow(readr::read_csv(path, show_col_types = FALSE))
+
 results <- map(files, in_parallel(
-  \(f) process(readr::read_csv(f)),
-  process = process          # declare every dependency explicitly
+  \(f) summarise_file(f),
+  summarise_file = summarise_file   # declare every dependency explicitly
 ))
 ```
 
