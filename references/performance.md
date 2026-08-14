@@ -91,11 +91,18 @@ duckdb_read_csv(con, "cars", path)
 
 tbl(con, "cars") %>%
   filter(mpg > 20) %>%
-  summarise(mean_hp = mean(hp), .by = cyl) %>%
+  summarise(mean_hp = mean(hp, na.rm = TRUE), .by = cyl) %>%
   collect()
 
 dbDisconnect(con, shutdown = TRUE)
 ```
+
+Note the explicit `na.rm = TRUE`. **SQL aggregate functions always ignore `NULL`**, so
+a database backend cannot honour R's default of returning `NA` when any input is
+missing. dbplyr warns — "Missing values are always removed in SQL aggregation
+functions" — rather than silently changing the semantics of your code. Writing
+`na.rm = TRUE` states the intent and silences it. The same warning appears through
+`dbplyr` against any database, not just DuckDB.
 
 DuckDB can query Parquet, CSV, and JSON files directly without loading into memory.
 

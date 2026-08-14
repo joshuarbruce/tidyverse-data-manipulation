@@ -8,7 +8,7 @@ description: >
   basics, ggplot2 charts, and the dtplyr bridge for large data.
 metadata:
   author: Joshua Bruce (@joshuarbruce)
-  version: "2.0"
+  version: "2.1"
 license: MIT
 ---
 
@@ -18,10 +18,12 @@ Write idiomatic, readable, modern tidyverse code. Much of the R on blog posts an
 Stack Overflow uses superseded APIs; this guide encodes the current approach and
 points at deeper references for each topic.
 
-Assumes current packages — notably **dplyr ≥ 1.2, tidyr ≥ 1.3.2, purrr ≥ 1.2,
-stringr ≥ 1.6, ggplot2 ≥ 4.0**. Several patterns here do not exist in earlier
-releases. If code must run against older versions, check `packageVersion()` and fall
-back to the superseded form rather than assuming the new function is present.
+Assumes **R ≥ 4.1** — the examples use the `\(x)` lambda shorthand, which is a syntax
+error on older R — and current packages, notably **dplyr ≥ 1.2, tidyr ≥ 1.3.2,
+purrr ≥ 1.2, stringr ≥ 1.6, ggplot2 ≥ 4.0**. Several patterns here do not exist in
+earlier releases. If code must run against older versions, check `getRversion()` and
+`packageVersion()`, and fall back to the superseded form rather than assuming the new
+function is present.
 
 ## Reference files
 
@@ -59,9 +61,11 @@ For a task spanning several topics, read several.
 ## Choosing tidyverse or data.table
 
 The tidyverse is the default: more readable, and it covers the whole workflow. Reach
-for **data.table** when data is large (roughly >1GB, or millions of rows), when speed
-is the explicit goal, when zero dependencies matter, or when the codebase already uses
-it. `data.table::fread()`/`fwrite()` are worth using for large files in any script.
+for **data.table** when the data is large enough that dplyr feels slow, when speed is
+the explicit goal, when zero dependencies matter, or when the codebase already uses it.
+There is no useful size threshold — the crossover depends far more on the operation
+than on row count, so measure rather than guess. `data.table::fread()`/`fwrite()` are
+worth using for large files in any script.
 
 **When the only reason is speed, prefer the `dtplyr` bridge** — `lazy_dt()` keeps
 dplyr syntax on the data.table engine. Drop to raw data.table only for in-place `:=`
@@ -125,7 +129,7 @@ starwars %>% filter_out(hair_color == "blond")   # keeps the NA rows too
 map(split(mtcars, mtcars$cyl), \(d) head(d, 2)) %>% list_rbind()
 ```
 
-**Column names** — normalize on import: `rename_with(df, str_to_snake)`.
+**Column names** — normalize on import: `df %>% rename_with(str_to_snake)`.
 
 ### Superseded and deprecated
 
@@ -155,14 +159,14 @@ result, and read the linked reference when the task touches one.
 | `slice_max(n = 1)` keeps ties by default | More rows than requested | [grouping.md](references/grouping.md) |
 | `NA` join keys **match** by default (unlike SQL) | Spurious matches on missing keys | [joins.md](references/joins.md) |
 | Duplicate keys on both sides | Row count silently multiplies | [joins.md](references/joins.md) |
-| A column shadows a same-named variable | Condition compares against the wrong thing | [tidy-eval.md](references/tidy-eval.md) |
+| `unmatched = "error"` guards the *dropped* side, not the `NA` side | Broken lookup table goes undetected | [joins.md](references/joins.md) |
+| `NA` conditions drop rows in `filter()` | Data lost without warning | [filtering-and-recoding.md](references/filtering-and-recoding.md) |
+| base `ifelse()` strips class | Dates become numbers | [filtering-and-recoding.md](references/filtering-and-recoding.md) |
 | `as.numeric()` on a factor | Returns level codes, not values | [factors-and-dates.md](references/factors-and-dates.md) |
 | `date + months(1)` on a month-end | Returns `NA`; use `%m+%` | [factors-and-dates.md](references/factors-and-dates.md) |
 | Filtering does not drop factor levels | Phantom empty categories in plots/counts | [factors-and-dates.md](references/factors-and-dates.md) |
-| `NA` conditions drop rows in `filter()` | Data lost without warning | [filtering-and-recoding.md](references/filtering-and-recoding.md) |
-| base `ifelse()` strips class | Dates become numbers | [filtering-and-recoding.md](references/filtering-and-recoding.md) |
+| A column shadows a same-named variable | Condition compares against the wrong thing | [tidy-eval.md](references/tidy-eval.md) |
 | `geom_bar()` counts rows; `geom_col()` plots values | Valid-looking chart, wrong heights | [visualization.md](references/visualization.md) |
-| `unmatched = "error"` guards the *dropped* side, not the `NA` side | Broken lookup table goes undetected | [joins.md](references/joins.md) |
 | `dt2 <- dt` aliases; `:=` then edits both | Original table mutated unexpectedly | [data-table.md](references/data-table.md) |
 | `setkey()` reorders rows in place | Original row order lost; `dt[1]` changes meaning | [data-table.md](references/data-table.md) |
 
@@ -175,8 +179,8 @@ the earliest and cheapest signal that one of these has fired.
 library(tidyverse)
 
 size_labels <- tibble(
-  species = c("Human", "Droid"),
-  label   = c("organic", "mechanical")
+  species = c("human", "wookiee", "gungan"),
+  label   = c("common", "tall", "tall")
 )
 
 result <- starwars %>%
@@ -185,12 +189,12 @@ result <- starwars %>%
     species = str_to_lower(str_trim(species)),
     bmi     = mass / (height / 100)^2
   ) %>%
-  # drop rows we don't want, NA-safely
-  filter_out(is.na(bmi)) %>%
-  filter(height > 100) %>%
+  # drop droids — filter_out keeps the 4 rows whose species is NA,
+  # where filter(species != "droid") would silently discard them
+  filter_out(species == "droid") %>%
+  filter(!is.na(bmi)) %>%
   # enrich
-  left_join(mutate(size_labels, species = str_to_lower(species)),
-            by = join_by(species)) %>%
+  left_join(size_labels, by = join_by(species)) %>%
   # aggregate
   summarise(
     avg_bmi = mean(bmi),
@@ -199,6 +203,10 @@ result <- starwars %>%
   ) %>%
   arrange(desc(n))
 ```
+
+The `filter_out()` step is the one worth pausing on: it keeps 81 rows where
+`filter(species != "droid")` keeps 77, and the four-row gap is entirely characters
+whose species is unrecorded. Dropping them is a decision, not a default.
 
 ## Style
 
