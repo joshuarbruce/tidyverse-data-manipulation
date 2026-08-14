@@ -18,8 +18,10 @@ is the only form that supports inequality and rolling joins:
 left_join(band_members, band_instruments, by = join_by(name))
 ```
 
-The older `by = c("name" = "name")` character form still works but is superseded;
-`join_by()` reads better and is checked at the call site.
+The character form `by = c("name" = "name")` is **not** deprecated or superseded —
+dplyr's docs list it as an accepted value alongside `join_by()`. Prefer `join_by()`
+anyway: it reads better, it is checked at the call site, and it is the only form that
+expresses anything beyond simple equality.
 
 ## Join types
 
@@ -140,8 +142,13 @@ not expect it to is the single most common source of wrong analysis results.
 
 **Other traps:**
 
-- **Factor vs character** — join keys must be the same type. Use `as.character()`
-  or `as_factor()` to align.
+- **Factor vs character keys coerce silently.** Joining a factor key to a character
+  key does not error or warn — vctrs finds a common type and the result comes back
+  `character`. That quietly discards the factor's level order, so anything downstream
+  relying on it (bar order in a plot, an ordered comparison) changes behavior with no
+  signal. Align the types deliberately with `as.character()` or `as_factor()` before
+  joining. Two factors with *different levels* also join fine; the result keeps the
+  union of the levels.
 - **Column name conflicts** — if both tables have a non-key column with the same
   name, dplyr adds `.x` and `.y` suffixes. Use `suffix = c("_left", "_right")`
   to make them meaningful, or rename before joining.

@@ -47,9 +47,14 @@ With `.by` this would repeat the grouping on every verb. Rule of thumb: one verb
 ### Grouping persists until you remove it
 
 `group_by()` attaches grouping to the data frame itself. **Every subsequent verb
-inherits it** — `filter()`, `mutate()`, `arrange()`, and `select()` all return a still-
+inherits it** — `filter()`, `mutate()`, `arrange()` and `select()` all return a still-
 grouped result — and it travels with the object out of a function and into whatever
 runs next. `ungroup()` is the only thing that clears it.
+
+Inheriting the grouping and *acting* on it are two different things, and `arrange()`
+is the verb where they come apart: it stays grouped but sorts the whole table anyway
+unless you pass `.by_group = TRUE`. See
+[`arrange()` ignores grouping](#arrange-ignores-grouping) below.
 
 Inspect it when unsure:
 
@@ -121,8 +126,19 @@ starwars %>% mutate(
 )
 ```
 
-Combine several mutations into one `mutate()` when they share a `.by`. Keep them
-separate only when the `.by` differs, or when a later column depends on an earlier one.
+Combine several mutations into one `mutate()` when they share a `.by`. A later column
+may reference an earlier one in the same call — that is supported and idiomatic, and it
+respects the grouping:
+
+```r
+starwars %>% mutate(
+  species_mean = mean(height, na.rm = TRUE),
+  vs_mean      = height - species_mean,   # uses the column defined just above
+  .by = species
+)
+```
+
+Split into separate `mutate()` calls only when the `.by` differs between them.
 
 ### Grouped filter
 
@@ -146,7 +162,8 @@ kept is not arbitrary.
 
 ### `arrange()` ignores grouping
 
-Unlike every other verb, `arrange()` does **not** respect `group_by()` unless you ask:
+Where `mutate()`, `filter()`, `summarise()` and `slice_*()` all compute within groups,
+`arrange()` does **not** sort within them unless you ask:
 
 ```r
 starwars %>% group_by(species) %>% arrange(height)                   # sorts whole table
@@ -217,10 +234,16 @@ starwars %>% mutate(n_missing = rowSums(is.na(pick(everything())))) %>% select(n
 `reframe()` (stable as of dplyr 1.2.0):
 
 ```r
+probs <- c(.25, .5, .75)
+
 starwars %>%
   filter(!is.na(height)) %>%
-  reframe(q = quantile(height, c(.25, .5, .75)), .by = gender)
+  reframe(p = probs, height = quantile(height, probs), .by = gender)
 ```
+
+Carry the labels through as their own column. `reframe(q = quantile(x, probs))` alone
+returns three unlabelled numbers per group, and nothing in the result says which is the
+median — a table that is correct and unusable.
 
 Fighting a "must return size 1" error from `summarise()` is the signal to switch.
 

@@ -135,17 +135,29 @@ map(split(mtcars, mtcars$cyl), \(d) head(d, 2)) %>% list_rbind()
 
 | Avoid | Use |
 |---|---|
-| `case_match()`, `recode()` | `recode_values()` / `replace_values()` |
-| `map_dfr()`, `map_dfc()` | `map() %>% list_rbind()` / `list_cbind()` |
-| `separate()` | `separate_wider_delim()` / `separate_wider_regex()` |
-| `by = c("a" = "b")` | `join_by(a == b)` |
-| `coord_flip()` | `orientation = "y"` on the geom |
-| `..var..`, `stat()`, `qplot()` | `after_stat()`, `ggplot()` + geoms |
-| `fct_explicit_na()` | `fct_na_value_to_level()` |
-| `size` for line width | `linewidth` |
+| Avoid | Use | Status |
+|---|---|---|
+| `case_match()` | `recode_values()` / `replace_values()` | **Deprecated** — warns |
+| `fct_explicit_na()` | `fct_na_value_to_level()` | **Deprecated** |
+| `..var..`, `stat()`, `qplot()` | `after_stat()`, `ggplot()` + geoms | **Deprecated** |
+| `geom_errorbarh()` | `geom_errorbar(orientation = "y")` | **Deprecated** |
+| `recode()` | `recode_values()` | Superseded |
+| `map_dfr()`, `map_dfc()` | `map() %>% list_rbind()` / `list_cbind()` | Superseded |
+| `separate()`, `extract()` | `separate_wider_delim()` / `separate_wider_regex()` | Superseded |
+| `coord_flip()` | `orientation = "y"` on the geom | Superseded |
+| `size` for line width | `linewidth` | Renamed in ggplot2 3.4 |
 
-`case_match()` warns as of dplyr 1.2.0. `map_chr()` no longer coerces numbers to
-strings and now errors instead — wrap in `as.character()` or use `map_vec()`.
+**Deprecated** warns and is scheduled for removal; **superseded** still works silently
+and is not going away. Both are worth avoiding in new code, but only the first is
+urgent — and reporting one as the other is a common way to be confidently wrong.
+
+Two things that are *not* superseded, despite often being described that way:
+`by = c("a" = "b")` in joins (prefer `join_by()` for clarity, but the character form is
+documented and supported) and `replace_na()` / `na_if()` (`replace_values()` generalizes
+them; it does not replace them).
+
+`map_chr()` no longer coerces numbers to strings and now errors instead — wrap in
+`as.character()` or use `map_vec()`.
 
 ### Silent failure modes
 

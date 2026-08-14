@@ -79,18 +79,19 @@ the wrong order, the fix is to control the factor, not the plot: convert with ex
 
 ggplot2 4.0 formalized several long-standing deprecations. Avoid these:
 
-| Old | Current |
-|---|---|
-| `..var..` or `stat(var)` inside `aes()` | `after_stat(var)` |
-| `qplot()` | `ggplot()` + geoms |
-| `coord_flip()` | `orientation = "y"` on the geom |
-| `geom_errorbarh()` | `geom_errorbar(orientation = "y")` |
-| `size` for line width | `linewidth` |
-| `trans` in scales | `transform` |
-| `fortify()` on model objects | `broom::augment()` |
+| Old | Current | Status |
+|---|---|---|
+| `..var..` or `stat(var)` inside `aes()` | `after_stat(var)` | **Deprecated** |
+| `qplot()` | `ggplot()` + geoms | **Deprecated** |
+| `geom_errorbarh()` | `geom_errorbar(orientation = "y")` | **Deprecated** |
+| `coord_flip()` | `orientation = "y"` on the geom | Superseded |
+| `size` for line width | `linewidth` | Deprecated in 3.4.0; `size` warns |
+| `trans` in scales and secondary axes | `transform` | Renamed; `trans` deprecated |
+| `fortify()` on model objects | `broom::augment()` | Deprecated for model objects |
 
-`coord_flip()` and `geom_errorbarh()` still work but are superseded; the `..var..`
-notation and `qplot()` are deprecated and warn.
+Deprecated forms warn and are scheduled for removal; `coord_flip()` is superseded and
+still works silently. Note that `geom_errorbarh()` and `coord_flip()` are often
+described together — they are not at the same stage.
 
 ## Saving
 
