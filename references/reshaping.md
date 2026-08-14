@@ -93,5 +93,9 @@ tibble::tibble(g = c("a", "a", "b"), v = c(1, NA, 3)) %>%
 ```
 
 To replace values *within* an existing column rather than fill gaps, see
-[filtering-and-recoding.md](filtering-and-recoding.md) —
-`replace_values()` supersedes `replace_na()` and `na_if()` for that purpose.
+[filtering-and-recoding.md](filtering-and-recoding.md). `replace_values()` generalizes
+both `replace_na()` and `na_if()` and can handle several columns and several mappings
+in one call — but note that **`replace_na()` and `na_if()` are not superseded**. Both
+carry no lifecycle badge and remain the clearest choice for the single-purpose case.
+Tidyup 7 describes `replace_values()` as an *alternative* to them, unlike
+`case_match()` and `recode()`, which it genuinely replaces.

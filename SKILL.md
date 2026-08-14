@@ -157,6 +157,7 @@ result, and read the linked reference when the task touches one.
 | Duplicate keys on both sides | Row count silently multiplies | [joins.md](references/joins.md) |
 | A column shadows a same-named variable | Condition compares against the wrong thing | [tidy-eval.md](references/tidy-eval.md) |
 | `as.numeric()` on a factor | Returns level codes, not values | [factors-and-dates.md](references/factors-and-dates.md) |
+| `date + months(1)` on a month-end | Returns `NA`; use `%m+%` | [factors-and-dates.md](references/factors-and-dates.md) |
 | Filtering does not drop factor levels | Phantom empty categories in plots/counts | [factors-and-dates.md](references/factors-and-dates.md) |
 | `NA` conditions drop rows in `filter()` | Data lost without warning | [filtering-and-recoding.md](references/filtering-and-recoding.md) |
 | base `ifelse()` strips class | Dates become numbers | [filtering-and-recoding.md](references/filtering-and-recoding.md) |

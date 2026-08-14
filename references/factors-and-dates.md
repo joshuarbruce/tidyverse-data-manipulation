@@ -145,8 +145,8 @@ before you group on it.
 lubridate distinguishes three kinds of time span, and the difference matters across
 daylight-saving boundaries and leap years:
 
-- **Periods** (`days()`, `months()`, `years()`) track human clock time — `d + months(1)`
-  lands on the same day of the next month.
+- **Periods** (`days()`, `months()`, `years()`) track human clock time — they keep the
+  day-of-month and let the underlying number of seconds vary.
 - **Durations** (`ddays()`, `dyears()`) track exact seconds — unaffected by DST.
 - **Intervals** (`interval(start, end)`) are a specific span between two instants.
 
@@ -158,3 +158,30 @@ d %within% interval(d - days(1), d + days(1))        # TRUE
 ```
 
 Use `%within%` to test whether an instant falls inside an interval.
+
+### Adding months to a month-end silently produces `NA`
+
+Because periods preserve the day-of-month, adding a month to the 31st asks for a date
+that does not exist. lubridate returns `NA` rather than guessing:
+
+```r
+ymd("2024-01-31") + months(1)      # NA        <- Feb 31 does not exist
+ymd("2024-02-29") + years(1)       # NA        <- 2025 is not a leap year
+ymd("2024-03-15") + months(1)      # 2024-04-15  (ordinary dates are fine)
+```
+
+This is easy to miss because most dates behave. Add one month to every month-end in
+2024 and **5 of 12 become `NA`** — so a monthly series built with `+ months(1)` loses
+January, March, May, August and October without any error.
+
+Use the rollback operators, which fall back to the last valid day of the target month:
+
+```r
+ymd("2024-01-31") %m+% months(1)   # 2024-02-29
+ymd("2024-01-31") %m-% months(1)   # 2023-12-31
+add_with_rollback(ymd("2024-01-31"), months(1))   # same, function form
+```
+
+Prefer `%m+%` / `%m-%` for any month or year arithmetic on data you did not generate
+yourself, since you cannot assume it avoids month-ends. `days()` and `weeks()` are
+unaffected — a fixed number of days always lands somewhere real.
