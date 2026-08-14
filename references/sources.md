@@ -2,8 +2,8 @@
 
 This file is the maintenance backbone for the skill: it lists the canonical
 documentation site, changelog, and source repository for every package the skill
-covers. When you want to verify that a pattern in `SKILL.md` is still current — or
-update the skill after a new release — start here.
+covers. When you want to verify that a pattern in `SKILL.md` or any reference file is
+still current — or update the skill after a new release — start here.
 
 ## How to check for updates
 
@@ -17,10 +17,17 @@ update the skill after a new release — start here.
 3. **Source repo** — the GitHub repo's `NEWS.md` and Releases tab carry the same
    information plus open issues/PRs if you need to dig deeper.
 
-When updating the skill, watch especially for **superseded** functions (still work
-but discouraged — e.g. `map_dfr()`) and **deprecated** functions (warn now, removed
-later — e.g. `separate()`). These are the patterns most likely to make the skill
-feel dated.
+When updating the skill, watch the two lifecycle badges, which are not the same thing:
+
+- **Superseded** — still works, no warning, not going away; a better alternative now
+  exists. Examples: `map_dfr()`, `separate()`, `extract()`, `recode()`, `coord_flip()`.
+- **Deprecated** — warns on use and is scheduled for removal. Examples: `case_match()`
+  (as of dplyr 1.2.0), `cur_data()`, `fct_explicit_na()`.
+
+Both are worth steering away from in new code, but only the second is urgent, and
+misreporting one as the other is exactly the kind of error that makes a skill
+untrustworthy. Check the badge in the function's own help page rather than assuming
+from a changelog entry.
 
 ## Core tidyverse packages
 
@@ -82,7 +89,19 @@ feel dated.
 | furrr (parallel purrr) | https://furrr.futureverse.org/ | https://github.com/futureverse/furrr |
 | bench (benchmarking) | https://bench.r-lib.org/ | https://github.com/r-lib/bench |
 | profvis (profiling) | https://profvis.r-lib.org/ | https://github.com/r-lib/profvis |
-| mirai (backs `purrr::in_parallel()`) | https://mirai.r-lib.org/ | https://github.com/r-lib/mirai |
+| mirai (runs `in_parallel()` workers) | https://mirai.r-lib.org/ | https://github.com/r-lib/mirai |
+| carrier (serializes `in_parallel()` functions) | https://cran.r-project.org/package=carrier | https://github.com/r-lib/carrier |
+
+`purrr::in_parallel()` needs **both** mirai and carrier; purrr only Suggests them, so
+neither is installed automatically. See
+[iteration.md](iteration.md).
+
+## Plotting support
+
+| Package | Docs | Source repo |
+|---|---|---|
+| scales (axis labels, formatters) | https://scales.r-lib.org/ | https://github.com/r-lib/scales |
+| broom (tidy model output; replaces `fortify()`) | https://broom.tidymodels.org/ | https://github.com/tidymodels/broom |
 
 ## Design proposals (tidyups)
 
@@ -112,9 +131,10 @@ Tidyup 7 and the best single explanation of which of the four functions to reach
 ## Acknowledgments & inspiration
 
 This skill was built from the official tidyverse documentation and R4DS (all linked
-above). Its structure and emphasis on *modern* tidyverse idioms (native pipe, `.by`
-grouping, `join_by()`, `map() %>% list_rbind()`) and its progressive-disclosure
-reference-file layout were directly informed by two community resources:
+above). Its emphasis on *modern* tidyverse idioms (`.by` grouping, `join_by()`,
+`filter_out()`, the `recode_values()` family, `map() %>% list_rbind()`) and its
+progressive-disclosure reference-file layout were directly informed by two community
+resources:
 
 | Resource | What it contributed | URL |
 |---|---|---|
@@ -134,9 +154,29 @@ stale while looking current. Record both:
 - **Content reconciled** — `SKILL.md` guidance checked against each package's current
   changelog and corrected: **2026-08-14**
 
-Versions current at the last content reconciliation: dplyr 1.2.1, tidyr 1.3.2,
-ggplot2 4.0.3, purrr 1.2.2, stringr 1.6.0, readr 2.2.0, forcats 1.0.1, tibble 3.3.1,
-lubridate 1.9.5, data.table 1.18.4, dtplyr 1.3.2.
+Two version numbers matter and they are not always the same. Guidance was checked
+against the **latest released** version's changelog; examples were **executed** against
+whatever was installed at the time. Record both, because a claim checked only against
+release notes is weaker than one that ran:
+
+| Package | Latest released | Examples executed against |
+|---|---|---|
+| dplyr | 1.2.1 | 1.2.0 |
+| tidyr | 1.3.2 | 1.3.2 |
+| ggplot2 | 4.0.3 | 4.0.2 |
+| purrr | 1.2.2 | 1.2.1 |
+| stringr | 1.6.0 | 1.6.0 |
+| readr | 2.2.0 | 2.2.0 |
+| forcats | 1.0.1 | 1.0.1 |
+| tibble | 3.3.1 | 3.3.1 |
+| lubridate | 1.9.5 | 1.9.5 |
+| data.table | 1.18.4 | 1.18.4 |
+| dtplyr | 1.3.2 | 1.3.3 |
+
+On R 4.5.3. The four mismatches are patch-level and none of them touch a documented
+behavior, but the gap is worth recording rather than papering over — the dplyr 1.2
+guidance in particular was verified by running on 1.2.0, and 1.2.1 was a C API
+compliance release with no user-facing change.
 
 If a docs link 404s, the package may have been renamed, retired, or moved orgs —
 check the [tidyverse blog](https://www.tidyverse.org/blog/) or search the

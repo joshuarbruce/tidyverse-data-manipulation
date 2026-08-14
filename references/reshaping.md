@@ -57,8 +57,10 @@ than hidden in a list-column.
 
 ## Splitting and combining columns
 
-`separate_wider_delim()` and `separate_wider_regex()` replace the deprecated
-`separate()`:
+`separate_wider_delim()` and `separate_wider_regex()` supersede `separate()` and
+`extract()`. Both older functions still work without warning — they carry the
+Superseded badge, not Deprecated — but the newer pair has clearer names and explicit
+handling for ragged input:
 
 ```r
 people <- tibble::tibble(full_name = c("Ada Lovelace", "Alan Turing"))

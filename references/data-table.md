@@ -1,10 +1,10 @@
 # data.table Reference
 
-`data.table` is a high-performance extension of base R's `data.frame`. It is the
-fastest in-memory data manipulation tool in R, handles datasets up to ~100GB,
-modifies columns by reference (no copying), and has **zero dependencies** beyond
-base R. The trade-off is a terser, less immediately readable syntax than the
-tidyverse.
+`data.table` is a high-performance extension of base R's `data.frame`. It is among the
+fastest in-memory data manipulation tools in R, modifies columns by reference (no
+copying), and has **zero dependencies** beyond base R — its own documentation cites
+aggregation of 100GB in RAM. The trade-off is a terser, less immediately readable
+syntax than the tidyverse.
 
 Read this file when a task involves large data, explicit performance needs, an
 existing data.table codebase, or the user names data.table directly. For everyday
@@ -12,7 +12,8 @@ work the tidyverse remains the default (see the decision guide in `SKILL.md`).
 
 ## The core idea: `DT[i, j, by]`
 
-Every data.table operation fits one bracket, read as SQL:
+Most data.table work happens inside one bracket, read as SQL (the `set*()` functions,
+`melt()`/`dcast()` and `fread()`/`fwrite()` below are the exceptions):
 
 ```
 DT[ i ,        j ,        by ]
@@ -63,9 +64,10 @@ dt[, grp_mean := mean(mpg), by = cyl]         # grouped update — writes the
                                               # group mean back to every row
 ```
 
-The grouped form (`:= ... by =`) is a defining data.table idiom: it computes per
-group but assigns to the original rows in place, which in dplyr would take a
-`group_by() %>% mutate() %>% ungroup()`.
+The grouped form (`:= ... by =`) is a defining data.table idiom: it computes per group
+but assigns to the original rows in place. The dplyr equivalent is
+`mutate(z = mean(x), .by = g)` — and note that dplyr returns a new data frame where
+data.table modifies the existing one.
 
 To avoid mutating the original, copy first: `dt2 <- copy(dt)`. For assigning inside
 a loop over many columns, `set(dt, i, j, value)` is the lowest-overhead option
@@ -147,8 +149,8 @@ sorts in place without setting a key.
 ## Secondary indices and `on=`
 
 A **secondary index** gives fast lookups on a column *without* physically reordering
-the table. The `on=` argument creates one on the fly (auto-indexing) — this is why
-the joins above use `on=`:
+the table. The `on=` argument creates one on the fly (auto-indexing) — which is why
+the joins further down use `on=` rather than requiring a key:
 
 ```r
 setindex(dt, gear)                 # build a reusable secondary index
@@ -180,14 +182,25 @@ makers <- data.table(cyl = c(4, 6, 8), label = c("small", "mid", "big"))
 merge(dt, makers, by = "cyl", all.x = TRUE)   # left join
 ```
 
-It also supports advanced joins the tidyverse does too — non-equi, rolling:
+The bracket form also supports the advanced joins dplyr gained in 1.1 — non-equi and
+rolling:
 
 ```r
 dt[makers, on = "cyl"]              # join by column
 
+# non-equi: match each car to the mpg band containing it
 bands <- data.table(lo = c(0, 20), hi = c(20, 40), band = c("thirsty", "efficient"))
-dt[bands, on = .(mpg >= lo, mpg < hi)]   # non-equi join
+dt[bands, on = .(mpg >= lo, mpg < hi)]
+
+# rolling: match to the nearest preceding value
+recs  <- data.table(t = c(1, 5, 9), reading = c(10, 20, 30))
+probe <- data.table(t = c(4, 8))
+recs[probe, on = "t", roll = TRUE]
 ```
+
+`roll = TRUE` carries the last observation forward; `roll = "nearest"` matches whichever
+side is closer. The dplyr counterpart is `join_by(closest(...))` — see
+[joins.md](joins.md).
 
 ## Fast file I/O
 
@@ -231,7 +244,7 @@ frank(x, ties.method = "min")             # fast rank
 | Add/modify column | `mutate(z = x + y)` | `dt[, z := x + y]` |
 | Summarise | `summarise(m = mean(x))` | `dt[, .(m = mean(x))]` |
 | Group + summarise | `summarise(m = mean(x), .by = g)` | `dt[, .(m = mean(x)), by = g]` |
-| Grouped mutate | `group_by(g) %>% mutate(z = mean(x))` | `dt[, z := mean(x), by = g]` |
+| Grouped mutate | `mutate(z = mean(x), .by = g)` | `dt[, z := mean(x), by = g]` |
 | Arrange | `arrange(desc(x))` | `dt[order(-x)]` |
 | Count per group | `count(g)` | `dt[, .N, by = g]` |
 | Distinct rows | `distinct()` | `unique(dt)` |
@@ -240,7 +253,7 @@ frank(x, ties.method = "min")             # fast rank
 | Conditional value | `if_else(c, a, b)` | `fifelse(c, a, b)` |
 | Multi-condition | `case_when(...)` | `fcase(...)` |
 | Lag / lead | `lag(x)` / `lead(x)` | `shift(x)` / `shift(x, type = "lead")` |
-| Left join | `left_join(y, by = "id")` | `merge(dt, y, by = "id", all.x = TRUE)` |
+| Left join | `left_join(y, by = join_by(id))` | `merge(dt, y, by = "id", all.x = TRUE)` |
 | Wide → long | `pivot_longer(...)` | `melt(dt, ...)` |
 | Long → wide | `pivot_wider(...)` | `dcast(dt, ...)` |
 | Read CSV | `read_csv("f.csv")` | `fread("f.csv")` |
