@@ -60,28 +60,102 @@ Class B findings. Repeat until a pass is clean.
 
 ---
 
-## Pass 1 — 2026-08-14
+## Pass 1 — 2026-08-14 (IN PROGRESS)
 
-Class A: **0 findings** across all nine checks at the start of the pass (123 blocks,
-116 executing, 92 URLs, validator exit 0). One Class A finding surfaced while building
-the harness and is recorded below.
+**Status: 6 of 14 files read. 8 remaining.** Class A is green; everything below was
+found by reading.
+
+### Where to resume
+
+Read the remaining files in this order, applying the four-step protocol above:
+
+1. `factors-and-dates.md` (187 lines)
+2. `performance.md` (154)
+3. `reshaping.md` (117)
+4. `tidy-eval.md` (124)
+5. `strings.md` (110)
+6. `iteration.md` (105)
+7. `import.md` (118)
+8. `visualization.md` (112) — partly touched this pass (deprecation table), not fully read
+
+Then re-read `data-table.md` and `sources.md` in the final zero-defect pass.
+
+### Deferred: reference token budget
+
+The references now total **25,063 tokens against the validator's 25,000 advisory**
+(hard error is 50,000). The simulated posit layout therefore exits 2, and because
+posit's `validate-skills.sh` runs under `pipefail`, that would fail their CI.
+
+Decision taken: **keep prioritizing correctness, trim once at the end** with full
+knowledge of what earned its place. Each pass adds roughly 300–400 tokens, so the gap
+widens — the final trim is real work, not a rounding adjustment. `data-table.md` (4,911
+tokens) is nearly twice the next largest file and is the obvious first place to look;
+whether `sources.md` (2,731) should be slimmed was explicitly deferred until the whole
+picture is visible.
+
+`run-audit.sh` reports this advisory as a known deferred item rather than failing, so
+the run does not sit permanently red. Any *other* validator warning still fails.
+
+### Findings
 
 | File | Read | Findings |
-|---|---|---|
-| `data-table.md` | ✓ (prior pass) | 6 — superlative, "every operation" overclaim, stale "joins above", two translation rows contradicting `grouping.md`/`joins.md`, rolling join promised but not shown |
-| `sources.md` | ✓ (prior pass) | 3 — `separate()` misclassified as deprecated, version list conflating two meanings, three packages used but unlisted |
-| `SKILL.md` | ✓ | 6 — see below |
-| `grouping.md` | pending | |
-| `joins.md` | pending | |
-| `filtering-and-recoding.md` | pending | |
-| `factors-and-dates.md` | pending | |
-| `performance.md` | pending | 1 (Class A) — duckdb example warned about `na.rm`; SQL aggregates always drop `NULL`, so dbplyr warns rather than silently changing semantics |
-| `reshaping.md` | pending | |
-| `tidy-eval.md` | pending | |
-| `strings.md` | pending | |
-| `iteration.md` | pending | |
-| `import.md` | pending | |
-| `visualization.md` | pending | |
+|---|---|---:|
+| `data-table.md` | ✓ | 6 |
+| `SKILL.md` | ✓ | 6 |
+| `filtering-and-recoding.md` | ✓ | 5 |
+| `grouping.md` | ✓ | 4 |
+| `sources.md` | ✓ | 3 |
+| `joins.md` | ✓ | 2 |
+| `performance.md` | partial | 1 (Class A) |
+| 8 files | pending | — |
+
+**Total so far: 27.**
+
+`data-table.md` — superlative ("the fastest tool in R"); "every operation fits one
+bracket" contradicted by the same file; stale "the joins above" when joins are below;
+two translation-table rows teaching what the rest of the skill says to avoid; rolling
+join promised but not demonstrated; `.I` example using non-existent columns.
+
+`sources.md` — `separate()` given as the example of *deprecated* inside the paragraph
+teaching deprecated-vs-superseded (it is Superseded); version list conflating "latest
+released" with "executed against"; three packages used but never listed.
+
+`SKILL.md` — R ≥ 4.1 never stated though `\(x)` appears in six files; worked example's
+"NA-safely" comment demonstrated nothing (`is.na()` cannot return `NA`); unsourced
+">1GB" threshold contradicting `performance.md`; ungrouped silent-failure table; a
+call-form example among pipe-first ones; stale frontmatter version.
+
+`filtering-and-recoding.md` — fizzbuzz branch unreachable at `x <- 1:20`;
+`replace_when()` wrongly offered as a way to avoid evaluating every RHS (it evaluates
+them too); `%in%` wrongly lumped into the NA-bug advice; a stated requirement that does
+not exist; an empty section heading; a broken sentence.
+
+`grouping.md` — advice to split `mutate()` calls on sequential dependency (wrong: a
+later column may reference an earlier one, and it respects `.by`); `arrange()` described
+as both inheriting and ignoring grouping without reconciling the two senses; "unlike
+every other verb" overclaim; `reframe()` example returning unlabelled quantiles.
+
+`joins.md` — `by = c(...)` called superseded (dplyr's docs list it as accepted);
+"join keys must be the same type" false (factor/character coerce silently, discarding
+level order).
+
+`performance.md` (Class A) — duckdb example warned about `na.rm`; SQL aggregates always
+drop `NULL`, so dbplyr warns rather than silently changing semantics.
+
+**Cross-file:** the deprecation tables in `SKILL.md` and `visualization.md` conflated
+deprecated with superseded. Verifying every row against its help page caught
+`geom_errorbarh()` — Deprecated, not Superseded, where it had been grouped with
+`coord_flip()`.
+
+### Harness changes forced by real failures
+
+- **Allowlist matched by index.** Inserting one block into `grouping.md` shifted every
+  later index and turned an intentional demo into a false failure. Now matched by
+  content substring, and a stale entry (matching zero or several blocks) is itself
+  reported — an allowlist that quietly stops matching is a hole in the audit.
+- **The venv copied into the audit directory was broken** (absolute paths from its
+  original location). Rebuild with `python3 -m venv venv && ./venv/bin/pip install
+  tiktoken frontmatter` if `count-skill-tokens.py` fails to launch.
 
 ### `SKILL.md` findings
 
