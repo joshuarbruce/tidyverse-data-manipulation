@@ -34,12 +34,26 @@ Useful arguments:
   Without it, duplicates produce list-columns and a warning.
 - `cols_vary` — controls output row ordering when pivoting several column sets.
 
-If `pivot_wider()` warns about duplicate identifiers, the fix is almost always to
-find them first rather than to silence the warning:
+If `pivot_wider()` warns about duplicate identifiers, the fix is almost always to find
+them first rather than to silence the warning. The warning means the id/name pair does
+not uniquely identify a value, so tidyr has nowhere to put the second one and returns a
+list-column:
 
 ```r
-fish_encounters %>% dplyr::count(fish, station) %>% dplyr::filter(n > 1)
+dup <- tibble::tibble(id = c(1, 1, 2), key = c("a", "a", "a"), val = c(10, 20, 30))
+
+pivot_wider(dup, names_from = key, values_from = val)
+#> Warning: Values from `val` are not uniquely identified; output will contain list-cols
+#> column `a` is now a list, not a number
+
+# find the offending combination
+dup %>% dplyr::count(id, key) %>% dplyr::filter(n > 1)
+#> id 1, key "a", n = 2
 ```
+
+Once you know which rows collide, either fix the data or aggregate deliberately with
+`values_fn = sum` (or `mean`, `first`, …) so the choice is visible in the code rather
+than hidden in a list-column.
 
 ## Splitting and combining columns
 

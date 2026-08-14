@@ -153,10 +153,21 @@ Two cheap checks catch most join bugs:
 ```r
 # 1. which rows found no match?
 anti_join(band_members, band_instruments, by = join_by(name))
+#> Mick  Stones
 
-# 2. which keys are duplicated? (duplicates are what multiply rows)
-band_instruments %>% count(name) %>% filter(n > 1)
+# 2. which keys are duplicated? duplicates are what multiply rows
+inst_dup <- tibble(
+  name  = c("John", "Paul", "Paul"),
+  plays = c("guitar", "bass", "piano")
+)
+
+inst_dup %>% count(name) %>% filter(n > 1)
+#> Paul  2
+
+nrow(left_join(band_members, inst_dup, by = join_by(name)))   # 4, not 3
 ```
 
 Run the first before trusting any enrichment join, and the second before joining
-anything you did not create yourself.
+anything you did not create yourself. The duplicate check is the more valuable of the
+two: an unmatched row is visible as an `NA`, whereas a duplicated key quietly adds
+rows that then inflate every count and sum computed downstream.

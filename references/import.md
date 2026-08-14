@@ -33,16 +33,36 @@ Useful arguments:
 
 ### Diagnosing parse failures
 
+`problems()` reports where the file disagreed with the column types in force — which
+in practice means the types **you** specified:
+
 ```r
-# challenge.csv is designed to break naive type guessing
-challenge <- read_csv(readr_example("challenge.csv"))
-problems(challenge)   # rows/columns where parsing failed, and what was expected
+path <- tempfile(fileext = ".csv")
+writeLines(c("id,score", paste0(1:1200, ",", 1:1200), "1201,not_measured"), path)
+
+# declare score numeric; the last row cannot be parsed as one
+d <- read_csv(path, col_types = cols(score = col_double()))
+problems(d)
+#> row 1202, col 2, expected "a double", actual "not_measured"
 ```
 
-`problems()` is the first thing to check when a column comes back as the wrong type or
-full of `NA`. readr guesses types from the first 1,000 rows by default; a value that
-breaks the guess appears far down the file. Raise `guess_max`, or set `col_types`
-explicitly.
+`problems()` gives the row, column, what was expected, and what was actually found —
+enough to go straight to the offending line.
+
+**Do not rely on `guess_max` the way older material suggests.** readr 1.x guessed
+column types from the first 1,000 rows, so a stray value further down produced a wrong
+type, and the standard advice was to raise `guess_max`. readr 2.x is vroom-backed and
+types the whole column: reading the file above with no `col_types` yields `character`
+regardless of whether `guess_max` is 10, 1,000, or `Inf`. Tested across the classic
+failure shapes — a late text value in a numeric column, a late decimal in an integer
+column, a late non-logical in a `TRUE`/`FALSE` column, and a column that is empty or
+`NA` until the final row — `guess_max` changed nothing on readr 2.2.0.
+
+The practical consequence is a reversal of the old workflow. Guessing rarely misfires
+now, so `problems()` is empty until you declare types — and declaring them is still
+worth doing, because a silently correct guess today can become a wrong one when next
+month's file arrives with different data. Specify `col_types` for anything load-bearing
+and let `problems()` tell you when reality stops matching the spec.
 
 ## Other formats
 
